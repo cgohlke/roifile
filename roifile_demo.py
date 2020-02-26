@@ -26,7 +26,7 @@ def plot_image_overlays(image, overlays, **kwargs):
     pyplot.show()
 
 
-# open an ImageJ TIFF file and read the image and overlay data.
+# open an ImageJ TIFF file and read the image and overlay data
 with TiffFile('tests/box.tif') as tif:
     image = tif.pages[0].asarray()
     overlays = tif.imagej_metadata['Overlays']
@@ -43,8 +43,10 @@ for region in regionprops(labeled):
 segmentation = 1.0 * (labeled > 0)
 
 # create ImageJ overlays from segmentation results
-overlays = [ImagejRoi.frompoints(numpy.round(contour)[:, ::-1]).tobytes()
-            for contour in find_contours(segmentation, level=0.9999)]
+overlays = [
+    ImagejRoi.frompoints(numpy.round(contour)[:, ::-1]).tobytes()
+    for contour in find_contours(segmentation, level=0.9999)
+]
 
 plot_image_overlays(image, overlays, lw=5)
 
