@@ -148,6 +148,45 @@ class ROI_OPTIONS(enum.IntFlag):
 ROI_COLOR_NONE = b'\x00\x00\x00\x00'
 
 
+def _decode_counters(data, counters_offset, n_coordinates):
+    """
+    See setCounters() / getCounters() methods in ImageJ source, ij/gui/PointRoi.java.
+
+    I believe this to be correct even if it doesn't work correctly in some cases due to ImageJ bugs. For example,
+    you can't actually set a ROI position with z-position > 65536 through the GUI even though it could be encoded here;
+    it will wrap around at 65536. This is made particularly annoying to debug because point ROIs will cease to be
+    rendered correctly, even though they will still be set correctly, somewhere in the low ten-thousands (in z).
+
+    Note: When ImageJ stacks have multiple explicit channels, both the z-coordinate and the channel index will be
+    encoded in the z-coordinate! Explicit support for this would be nice here.
+    """
+
+    counters = []
+    positions = []
+    for offset in range(counters_offset, counters_offset + 4 * n_coordinates, 4):
+        b0, b1, b2, b3 = data[offset:offset+4]
+
+        counters.append(b3)
+        positions.append((b0 << 16) + (b1 << 8) + b2)
+
+    return counters, positions
+
+
+def _encode_counters(counters, positions, byteorder='>'):
+    assert len(counters) == len(positions)
+
+    encoded_counters = []
+    for c, p in zip(counters, positions):
+        _, b0, b1, b2 = struct.pack('>i', p)
+        _, _, _, b3 = struct.pack('>i', c)
+
+        counter = (b0 << 32) + (b1 << 16) + (b2 << 8) + b3
+        encoded_counters.append(counter)
+
+    return numpy.array(
+        encoded_counters, dtype=byteorder + 'i4').tobytes(order='F')
+
+
 class ImagejRoi:
     """Read and write ImageJ ROI format."""
 
@@ -191,6 +230,7 @@ class ImagejRoi:
     subpixel_coordinates = None
     multi_coordinates = None
     counters = None
+    z_coordinates = None
     text_size = 0
     text_style = 0
     text_justification = 0
@@ -379,12 +419,7 @@ class ImagejRoi:
                 self.props = props.decode(self.utf16)
 
             if counters_offset > 0:
-                self.counters = numpy.ndarray(
-                    shape=self.n_coordinates,
-                    dtype=self.byteorder + 'i4',
-                    buffer=data,
-                    offset=counters_offset
-                    ).copy()
+                self.counters, self.z_coordinates = _decode_counters(data, counters_offset, self.n_coordinates)
 
         if self.version >= 218 and self.subtype == ROI_SUBTYPE.TEXT:
             (
@@ -575,8 +610,8 @@ class ImagejRoi:
         if roi_props_length > 0:
             result.append(self.props.encode(self.utf16))
         if self.counters is not None:
-            counters = self.counters.astype(self.byteorder + 'i4')
-            result.append(counters.tobytes(order='F'))
+            result.append(_encode_counters(
+                self.counters, self.z_coordinates, byteorder=self.byteorder))
 
         return b''.join(result)
 
