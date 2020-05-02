@@ -45,11 +45,11 @@ setup(
     entry_points={
         'console_scripts': ['roifile = roifile.roifile:main']},
     python_requires='>=3.6',
-    install_requires=['numpy>=1.14.5'],
+    install_requires=['numpy>=1.15.1'],
     extras_require={
         'all': [
             'matplotlib>=3.1',
-            'tifffile>=2019.7.26',
+            'tifffile>=2020.2.16',
         ]
     },
     platforms=['any'],
