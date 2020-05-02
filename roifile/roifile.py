@@ -32,9 +32,8 @@
 """Read and write ImageJ ROI format.
 
 Roifile is a Python library to read, write, create, and plot `ImageJ`_ ROIs,
-an undocumented and ImageJ application specific format
-to store regions of interest, geometric shapes, paths, text, and whatnot
-for image overlays.
+an undocumented and ImageJ application specific format to store regions of
+interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 .. _ImageJ: https://imagej.net
 
@@ -46,19 +45,30 @@ for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.2.12
+:Version: 2020.5.1
 
 Requirements
 ------------
 * `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2019.7.2 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2020.2.16 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.5.1
+    Split positions from counters.
 2020.2.12
     Initial release.
+
+Notes
+-----
+
+Other Python packages handling ImageJ ROIs:
+
+* `ijpython_roi <https://github.com/dwaithe/ijpython_roi>`_
+* `imagej-tiff-meta <https://github.com/csachs/imagej-tiff-meta>`_
+* `read-roi <https://github.com/hadim/read-roi/>`_
 
 Examples
 --------
@@ -73,7 +83,7 @@ array([[1.1, 2.2],
 >>> roi.left, roi.left, roi.right, roi.bottom
 (1, 1, 5, 6)
 
-Export the instance to an ImageJ ROI formatted byte string or file:
+Export the instance to an ImageJ ROI formatted bytes or file:
 
 >>> out = roi.tobytes()
 >>> out[:4]
@@ -95,7 +105,7 @@ run ``python -m roifile _test.roi``.
 
 """
 
-__version__ = '2020.2.12'
+__version__ = '2020.5.1'
 
 __all__ = ('ImagejRoi', 'ROI_TYPE',  'ROI_SUBTYPE', 'ROI_OPTIONS')
 
@@ -191,6 +201,7 @@ class ImagejRoi:
     subpixel_coordinates = None
     multi_coordinates = None
     counters = None
+    counter_positions = None  # flat indices into TZC array
     text_size = 0
     text_style = 0
     text_justification = 0
@@ -379,12 +390,14 @@ class ImagejRoi:
                 self.props = props.decode(self.utf16)
 
             if counters_offset > 0:
-                self.counters = numpy.ndarray(
+                counters = numpy.ndarray(
                     shape=self.n_coordinates,
-                    dtype=self.byteorder + 'i4',
+                    dtype=self.byteorder + 'u4',
                     buffer=data,
                     offset=counters_offset
-                    ).copy()
+                    )
+                self.counters = (counters & 0xFF).astype('u1')
+                self.counter_positions = counters >> 8
 
         if self.version >= 218 and self.subtype == ROI_SUBTYPE.TEXT:
             (
@@ -575,8 +588,12 @@ class ImagejRoi:
         if roi_props_length > 0:
             result.append(self.props.encode(self.utf16))
         if self.counters is not None:
-            counters = self.counters.astype(self.byteorder + 'i4')
-            result.append(counters.tobytes(order='F'))
+            counters = self.counters.astype(self.byteorder + 'u4')
+            if self.counter_positions is not None:
+                indices = self.counter_positions.astype(self.byteorder + 'u4')
+                counters = counters & 0xFF | indices << 8
+                counters = counters.astype(self.byteorder + 'u4')
+            result.append(counters.tobytes())
 
         return b''.join(result)
 
