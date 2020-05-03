@@ -2,9 +2,8 @@ Read and write ImageJ ROI format
 ================================
 
 Roifile is a Python library to read, write, create, and plot `ImageJ`_ ROIs,
-an undocumented and ImageJ application specific format
-to store regions of interest, geometric shapes, paths, text, and whatnot
-for image overlays.
+an undocumented and ImageJ application specific format to store regions of
+interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 .. _ImageJ: https://imagej.net
 
@@ -16,19 +15,30 @@ for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.2.12
+:Version: 2020.5.1
 
 Requirements
 ------------
 * `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2019.7.2 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2020.2.16 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.5.1
+    Split positions from counters.
 2020.2.12
     Initial release.
+
+Notes
+-----
+
+Other Python packages handling ImageJ ROIs:
+
+* `ijpython_roi <https://github.com/dwaithe/ijpython_roi>`_
+* `imagej-tiff-meta <https://github.com/csachs/imagej-tiff-meta>`_
+* `read-roi <https://github.com/hadim/read-roi/>`_
 
 Examples
 --------
@@ -43,7 +53,7 @@ array([[1.1, 2.2],
 >>> roi.left, roi.left, roi.right, roi.bottom
 (1, 1, 5, 6)
 
-Export the instance to an ImageJ ROI formatted byte string or file:
+Export the instance to an ImageJ ROI formatted bytes or file:
 
 >>> out = roi.tobytes()
 >>> out[:4]
