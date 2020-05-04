@@ -50,5 +50,5 @@ overlays = [
 
 plot_image_overlays(image, overlays, lw=5)
 
-# write the image and overlays to an new ImageJ TIFF file
-imwrite('roi_test.tif', image, imagej=True, ijmetadata={'Overlays': overlays})
+# write the image and overlays to a new ImageJ TIFF file
+imwrite('roi_test.tif', image, imagej=True, metadata={'Overlays': overlays})
