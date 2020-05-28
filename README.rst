@@ -15,17 +15,22 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.5.1
+:Version: 2020.5.28
 
 Requirements
 ------------
 * `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.2.16 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2020.5.25 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.5.28
+    Fix int32 to hex color conversion.
+    Fix coordinates of closing path.
+2020.5.2
+    Fix reading TIFF files with no overlays.
 2020.5.1
     Split positions from counters.
 2020.2.12
@@ -37,7 +42,6 @@ Notes
 Other Python packages handling ImageJ ROIs:
 
 * `ijpython_roi <https://github.com/dwaithe/ijpython_roi>`_
-* `imagej-tiff-meta <https://github.com/csachs/imagej-tiff-meta>`_
 * `read-roi <https://github.com/hadim/read-roi/>`_
 
 Examples
