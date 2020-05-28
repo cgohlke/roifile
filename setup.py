@@ -49,7 +49,7 @@ setup(
     extras_require={
         'all': [
             'matplotlib>=3.1',
-            'tifffile>=2020.2.16',
+            'tifffile>=2020.5.25',
         ]
     },
     platforms=['any'],
@@ -63,5 +63,6 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 )
