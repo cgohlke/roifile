@@ -45,17 +45,22 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.5.1
+:Version: 2020.5.28
 
 Requirements
 ------------
 * `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.2.16 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2020.5.25 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.5.28
+    Fix int32 to hex color conversion.
+    Fix coordinates of closing path.
+2020.5.2
+    Fix reading TIFF files with no overlays.
 2020.5.1
     Split positions from counters.
 2020.2.12
@@ -67,7 +72,6 @@ Notes
 Other Python packages handling ImageJ ROIs:
 
 * `ijpython_roi <https://github.com/dwaithe/ijpython_roi>`_
-* `imagej-tiff-meta <https://github.com/csachs/imagej-tiff-meta>`_
 * `read-roi <https://github.com/hadim/read-roi/>`_
 
 Examples
@@ -105,7 +109,7 @@ run ``python -m roifile _test.roi``.
 
 """
 
-__version__ = '2020.5.1'
+__version__ = '2020.5.28'
 
 __all__ = ('ImagejRoi', 'ROI_TYPE',  'ROI_SUBTYPE', 'ROI_OPTIONS')
 
@@ -277,12 +281,13 @@ class ImagejRoi:
             with tifffile.TiffFile(filename) as tif:
                 if not tif.is_imagej:
                     raise ValueError('file does not contain ImagejRoi')
+                rois = []
                 if 'Overlays' in tif.imagej_metadata:
                     overlays = tif.imagej_metadata['Overlays']
                     if isinstance(overlays, list):
-                        rois = overlays
+                        rois.extend(overlays)
                     else:
-                        rois = [overlays]
+                        rois.append(overlays)
                 if 'ROI' in tif.imagej_metadata:
                     roi = tif.imagej_metadata['ROI']
                     if isinstance(roi, list):
@@ -704,8 +709,8 @@ class ImagejRoi:
         """Return color (bytes) as hex triplet or None if black."""
         if b == ROI_COLOR_NONE:
             return None
-        if self.byteorder == '<':
-            return f'#{b[0]:02x}{b[1]:02x}{b[2]:02x}'
+        if self.byteorder == '>':
+            return f'#{b[1]:02x}{b[2]:02x}{b[3]:02x}'
         return f'#{b[3]:02x}{b[2]:02x}{b[1]:02x}'
 
     @staticmethod
@@ -723,7 +728,7 @@ class ImagejRoi:
                     coordinates.append(numpy.array(points))
                     points = []
                 points.append([path[n + 1], path[n + 2]])
-                m = len(points)
+                m = len(points) - 1
                 n += 3
             elif op == 1:
                 # LINETO
@@ -825,7 +830,7 @@ def test_imagejroi():
     coords = roi.coordinates(multi=True)
     assert len(coords) == 31
     assert coords[0][0][0] == 767.0
-    assert coords[-1][-1][-1] == 588.0
+    assert coords[-1][-1][-1] == 587.0
     assert roi.multi_coordinates[0] == 0.0
     roi.__str__()
 
@@ -884,7 +889,8 @@ def main(argv=None, test=False):
                 for roi in rois:
                     print(roi)
                     print()
-                rois[0].plot(rois=rois, title=title)
+                if rois:
+                    rois[0].plot(rois=rois, title=title)
             else:
                 print(rois)
                 print()
