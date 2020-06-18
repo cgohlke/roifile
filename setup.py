@@ -39,8 +39,13 @@ setup(
     long_description=readme,
     author='Christoph Gohlke',
     author_email='cgohlke@uci.edu',
-    url='https://www.lfd.uci.edu/~gohlke/',
     license='BSD',
+    url='https://www.lfd.uci.edu/~gohlke/',
+    project_urls={
+        'Bug Tracker': 'https://github.com/cgohlke/roifile/issues',
+        'Source Code': 'https://github.com/cgohlke/roifile',
+        # 'Documentation': 'https://',
+    },
     packages=['roifile'],
     entry_points={
         'console_scripts': ['roifile = roifile.roifile:main']},
@@ -49,7 +54,7 @@ setup(
     extras_require={
         'all': [
             'matplotlib>=3.1',
-            'tifffile>=2020.5.25',
+            'tifffile>=2020.6.3',
         ]
     },
     platforms=['any'],
@@ -60,7 +65,6 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
