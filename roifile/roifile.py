@@ -45,21 +45,23 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.5.28
+:Version: 2020.8.13
 
 Requirements
 ------------
-* `CPython >= 3.6 <https://www.python.org>`_
+* `CPython >= 3.7 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.5.25 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
+* `Tifffile 2020.8.13 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.2 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.8.13
+    Support writing to ZIP file.
+    Support os.PathLike file names.
 2020.5.28
     Fix int32 to hex color conversion.
     Fix coordinates of closing path.
-2020.5.2
     Fix reading TIFF files with no overlays.
 2020.5.1
     Split positions from counters.
@@ -68,6 +70,9 @@ Revisions
 
 Notes
 -----
+
+The ImageJ ROI format cannot store integer coordinate values outside the
+range of -32768 to 32767 (16-bit signed).
 
 Other Python packages handling ImageJ ROIs:
 
@@ -109,10 +114,11 @@ run ``python -m roifile _test.roi``.
 
 """
 
-__version__ = '2020.5.28'
+__version__ = '2020.8.13'
 
 __all__ = ('ImagejRoi', 'ROI_TYPE',  'ROI_SUBTYPE', 'ROI_OPTIONS')
 
+import os
 import sys
 import enum
 import struct
@@ -276,6 +282,7 @@ class ImagejRoi:
         For ZIP or TIFF files, return a list of ImagejRoi.
 
         """
+        filename = os.fspath(filename)
         if filename[-4:].lower() == '.tif':
             import tifffile
             with tifffile.TiffFile(filename) as tif:
@@ -400,7 +407,7 @@ class ImagejRoi:
                     dtype=self.byteorder + 'u4',
                     buffer=data,
                     offset=counters_offset
-                    )
+                )
                 self.counters = (counters & 0xFF).astype('u1')
                 self.counter_positions = counters >> 8
 
@@ -433,7 +440,7 @@ class ImagejRoi:
                 buffer=data,
                 offset=64,
                 order='F'
-                ).copy()
+            ).copy()
 
             if self.subpixelresolution:
                 self.subpixel_coordinates = numpy.ndarray(
@@ -442,7 +449,7 @@ class ImagejRoi:
                     buffer=data,
                     offset=64 + self.n_coordinates * 4,
                     order='F'
-                    ).copy()
+                ).copy()
 
         elif self.composite and self.roitype == ROI_TYPE.RECT:
             self.multi_coordinates = numpy.ndarray(
@@ -450,17 +457,34 @@ class ImagejRoi:
                 dtype=self.byteorder + 'f4',
                 buffer=data,
                 offset=64
-                ).copy()
+            ).copy()
 
         elif self.roitype not in (ROI_TYPE.RECT, ROI_TYPE.LINE, ROI_TYPE.OVAL):
             log_warning(f'cannot handle ImagejRoi type {self.roitype!r}')
 
         return self
 
-    def tofile(self, filename):
-        """Write ImagejRoi to a new ROI file."""
-        with open(filename, 'wb') as fh:
-            fh.write(self.tobytes())
+    def tofile(self, filename, name=None, mode=None):
+        """Write ImagejRoi to a ROI or ZIP file.
+
+        Existing ZIP files are opened for append.
+
+        """
+        filename = os.fspath(filename)
+        if filename[-4:].lower() == '.zip':
+            import zipfile
+            if name is None:
+                name = self.name if self.name else self.autoname
+            if name[-4:].lower() != '.roi':
+                name += '.roi'
+            if mode is None:
+                mode = 'a' if os.path.exists(filename) else 'w'
+            with zipfile.ZipFile(filename, mode) as zf:
+                with zf.open(name, 'w') as fh:
+                    fh.write(self.tobytes())
+        else:
+            with open(filename, 'wb') as fh:
+                fh.write(self.tobytes())
 
     def tobytes(self):
         """Return ImagejRoi as bytes."""
@@ -700,15 +724,17 @@ class ImagejRoi:
                  [self.left, self.bottom],
                  [self.right, self.bottom],
                  [self.right, self.top],
-                 [self.left, self.top]], 'f4')
+                 [self.left, self.top]],
+                'f4'
+            )
         else:
             coords = numpy.empty((0, 2), dtype=self.byteorder + 'i4')
         return [coords] if multi else coords
 
-    def hexcolor(self, b):
+    def hexcolor(self, b, default=None):
         """Return color (bytes) as hex triplet or None if black."""
         if b == ROI_COLOR_NONE:
-            return None
+            return default
         if self.byteorder == '>':
             return f'#{b[1]:02x}{b[2]:02x}{b[3]:02x}'
         return f'#{b[3]:02x}{b[2]:02x}{b[1]:02x}'
@@ -777,6 +803,17 @@ class ImagejRoi:
             ))
 
     @property
+    def autoname(self):
+        """Return name generated from positions."""
+        y = (self.bottom - self.top) // 2
+        x = (self.right - self.left) // 2
+        name = f'{y:05}-{x:05}'
+        if self.counter_positions is not None:
+            tzc = int(self.counter_positions.max())
+            name = f'{tzc:05}-' + name
+        return name
+
+    @property
     def utf16(self):
         """Return UTF-16 codec depending on byteorder."""
         return 'utf-16' + ('be' if self.byteorder == '>' else 'le')
@@ -814,6 +851,7 @@ def log_warning(msg, *args, **kwargs):
 
 def test_imagejroi():
     """Test roifile.ImagejRoi class."""
+    # test ROIs from a ZIP file
     rois = ImagejRoi.fromfile('tests/ijzip.zip')
     assert len(rois) == 7
     for roi in rois:
@@ -821,6 +859,16 @@ def test_imagejroi():
         roi.coordinates()
         roi.__str__()
 
+    # re-write ROIs to a ZIP file
+    try:
+        os.remove('_test.zip')
+    except OSError:
+        pass
+    for roi in rois:
+        roi.tofile('_test.zip')
+    assert ImagejRoi.fromfile('_test.zip')[-1] == rois[-1]
+
+    # verify box_combined
     roi = ImagejRoi.fromfile('tests/box_combined.roi')
     assert roi.tobytes() == ImagejRoi.frombytes(roi.tobytes()).tobytes()
     assert roi.name == '0464-0752'
@@ -834,6 +882,7 @@ def test_imagejroi():
     assert roi.multi_coordinates[0] == 0.0
     roi.__str__()
 
+    # read a ROI from a TIFF file
     for roi in ImagejRoi.fromfile('tests/IJMetadata.tif'):
         assert roi == ImagejRoi.frombytes(roi.tobytes())
         roi.coordinates()
@@ -850,7 +899,6 @@ def main(argv=None, test=False):
     ``python -m roifile file_or_directory``
 
     """
-    import os
     from glob import glob
 
     if argv is None:
