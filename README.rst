@@ -15,21 +15,23 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.5.28
+:Version: 2020.8.13
 
 Requirements
 ------------
-* `CPython >= 3.6 <https://www.python.org>`_
+* `CPython >= 3.7 <https://www.python.org>`_
 * `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.5.25 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.1 <https://pypi.org/project/matplotlib/>`_  (optional)
+* `Tifffile 2020.8.13 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.2 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.8.13
+    Support writing to ZIP file.
+    Support os.PathLike file names.
 2020.5.28
     Fix int32 to hex color conversion.
     Fix coordinates of closing path.
-2020.5.2
     Fix reading TIFF files with no overlays.
 2020.5.1
     Split positions from counters.
@@ -38,6 +40,9 @@ Revisions
 
 Notes
 -----
+
+The ImageJ ROI format cannot store integer coordinate values outside the
+range of -32768 to 32767 (16-bit signed).
 
 Other Python packages handling ImageJ ROIs:
 
