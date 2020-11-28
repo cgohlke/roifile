@@ -45,17 +45,24 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.8.13
+:Version: 2020.11.28
 
 Requirements
 ------------
-* `CPython >= 3.7 <https://www.python.org>`_
-* `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.8.13 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.2 <https://pypi.org/project/matplotlib/>`_  (optional)
+This release has been tested with the following requirements and dependencies
+(other versions may work):
+
+* `CPython 3.7.9, 3.8.6, 3.9.0 64-bit <https://www.python.org>`_
+* `Numpy 1.19.4 <https://pypi.org/project/numpy/>`_
+* `Tifffile 2020.11.26 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.11.28
+    Support group attribute.
+    Add roiread and roiwrite functions (#3).
+    Use UUID as default name of ROI in ImagejRoi.frompoints (#2).
 2020.8.13
     Support writing to ZIP file.
     Support os.PathLike file names.
@@ -92,7 +99,7 @@ array([[1.1, 2.2],
 >>> roi.left, roi.left, roi.right, roi.bottom
 (1, 1, 5, 6)
 
-Export the instance to an ImageJ ROI formatted bytes or file:
+Export the instance to an ImageJ ROI formatted byte string or file:
 
 >>> out = roi.tobytes()
 >>> out[:4]
@@ -114,16 +121,58 @@ run ``python -m roifile _test.roi``.
 
 """
 
-__version__ = '2020.8.13'
+__version__ = '2020.11.28'
 
-__all__ = ('ImagejRoi', 'ROI_TYPE',  'ROI_SUBTYPE', 'ROI_OPTIONS')
+__all__ = (
+    'roiread',
+    'roiwrite',
+    'ImagejRoi',
+    'ROI_TYPE',
+    'ROI_SUBTYPE',
+    'ROI_OPTIONS',
+)
 
-import os
-import sys
 import enum
+import os
 import struct
+import sys
+import zipfile
 
 import numpy
+
+
+def roiread(filename):
+    """Return ImagejRoi instance(s) from ROI, ZIP, or TIFF file.
+
+    For ZIP or TIFF files, return a list of ImagejRoi.
+
+    """
+    return ImagejRoi.fromfile(filename)
+
+
+def roiwrite(filename, roi, name=None, mode=None):
+    """Write ImagejRoi instance(s) to ROI or ZIP file.
+
+    Write an ImagejRoi instance to a ROI file or write a sequence of ImagejRoi
+    instances to a ZIP file. Existing ZIP files are opened for append.
+
+    """
+    filename = os.fspath(filename)
+
+    if isinstance(roi, ImagejRoi):
+        return roi.tofile(filename, name=name, mode=mode)
+
+    if mode is None:
+        mode = 'a' if os.path.exists(filename) else 'w'
+
+    if name is None:
+        name = [r.name if r.name else r.autoname for r in roi]
+    name = [n if n[-4:].lower() == '.roi' else n + '.roi' for n in name]
+
+    with zipfile.ZipFile(filename, mode) as zf:
+        for n, r in zip(name, roi):
+            with zf.open(n, 'w') as fh:
+                fh.write(r.tobytes())
 
 
 class ROI_TYPE(enum.IntEnum):
@@ -204,6 +253,7 @@ class ImagejRoi:
     heightd = 0.0
     overlay_label_color = ROI_COLOR_NONE
     overlay_font_size = 0
+    group = 0
     image_opacity = 0
     image_size = 0
     float_stroke_width = 0.0
@@ -219,8 +269,16 @@ class ImagejRoi:
     text = ''
 
     @classmethod
-    def frompoints(cls, points=None, name=None, position=None, index=None,
-                   c=None, z=None, t=None):
+    def frompoints(
+        cls,
+        points=None,
+        name=None,
+        position=None,
+        index=None,
+        c=None,
+        z=None,
+        t=None,
+    ):
         """Return ImagejRoi instance from sequence of Point coordinates."""
         if points is None:
             return None
@@ -229,8 +287,7 @@ class ImagejRoi:
         self.version = 226
         self.roitype = ROI_TYPE.FREEHAND
         self.options = (
-            ROI_OPTIONS.OVERLAY_BACKGROUNDS |
-            ROI_OPTIONS.OVERLAY_LABELS
+            ROI_OPTIONS.OVERLAY_BACKGROUNDS | ROI_OPTIONS.OVERLAY_LABELS
         )
         if position is not None:
             self.position = position + 1
@@ -242,8 +299,9 @@ class ImagejRoi:
             self.t_position = t + 1
         if name is None:
             if index is None:
-                index = numpy.random.randint(0, 2**31 - 1)
-                name = f'F{self.t_position:02}-{index:x}'
+                import uuid
+
+                name = str(uuid.uuid1())
             else:
                 name = f'F{self.t_position:02}-C{index}'
         self.name = name
@@ -285,6 +343,7 @@ class ImagejRoi:
         filename = os.fspath(filename)
         if filename[-4:].lower() == '.tif':
             import tifffile
+
             with tifffile.TiffFile(filename) as tif:
                 if not tif.is_imagej:
                     raise ValueError('file does not contain ImagejRoi')
@@ -304,10 +363,11 @@ class ImagejRoi:
                 return [cls.frombytes(roi) for roi in rois]
 
         if filename[-4:].lower() == '.zip':
-            import zipfile
             with zipfile.ZipFile(filename) as zf:
-                return [cls.frombytes(zf.open(name).read())
-                        for name in zf.namelist()]
+                return [
+                    cls.frombytes(zf.open(name).read())
+                    for name in zf.namelist()
+                ]
 
         with open(filename, 'rb') as fh:
             data = fh.read()
@@ -352,27 +412,24 @@ class ImagejRoi:
         self.options = ROI_OPTIONS(options)
 
         if self.subpixelrect:
-            (
-                self.xd,
-                self.yd,
-                self.widthd,
-                self.heightd
-            ) = struct.unpack(self.byteorder + 'ffff', data[18:34])
+            (self.xd, self.yd, self.widthd, self.heightd) = struct.unpack(
+                self.byteorder + 'ffff', data[18:34]
+            )
         elif (
-            self.roitype == ROI_TYPE.LINE or
-            self.roitype == ROI_TYPE.FREEHAND and (
-                self.subtype == ROI_SUBTYPE.ELLIPSE or
-                self.subtype == ROI_SUBTYPE.ROTATED_RECT)
+            self.roitype == ROI_TYPE.LINE
+            or self.roitype == ROI_TYPE.FREEHAND
+            and (
+                self.subtype == ROI_SUBTYPE.ELLIPSE
+                or self.subtype == ROI_SUBTYPE.ROTATED_RECT
+            )
         ):
-            (
-                self.x1,
-                self.y1,
-                self.x2,
-                self.y2
-            ) = struct.unpack(self.byteorder + 'ffff', data[18:34])
+            (self.x1, self.y1, self.x2, self.y2) = struct.unpack(
+                self.byteorder + 'ffff', data[18:34]
+            )
         elif self.n_coordinates == 0:
             self.n_coordinates = struct.unpack(
-                self.byteorder + 'i', data[18:22])[0]
+                self.byteorder + 'i', data[18:22]
+            )[0]
 
         if 0 < header2_offset < len(data) - 52:
             (
@@ -383,22 +440,26 @@ class ImagejRoi:
                 name_length,
                 self.overlay_label_color,
                 self.overlay_font_size,
-                available_byte1,
+                self.group,
                 self.image_opacity,
                 self.image_size,
                 self.float_stroke_width,
                 roi_props_offset,
                 roi_props_length,
-                counters_offset
-            ) = struct.unpack(self.byteorder + '4xiiiii4shBBifiii',
-                              data[header2_offset: header2_offset+52])
+                counters_offset,
+            ) = struct.unpack(
+                self.byteorder + '4xiiiii4shBBifiii',
+                data[header2_offset : header2_offset + 52],
+            )
 
             if name_offset > 0 and name_length > 0:
-                name = data[name_offset: name_offset+name_length*2]
+                name = data[name_offset : name_offset + name_length * 2]
                 self.name = name.decode(self.utf16)
 
             if roi_props_offset > 0 and roi_props_length > 0:
-                props = data[roi_props_offset: name_offset+roi_props_length*2]
+                props = data[
+                    roi_props_offset : name_offset + roi_props_length * 2
+                ]
                 self.props = props.decode(self.utf16)
 
             if counters_offset > 0:
@@ -406,7 +467,7 @@ class ImagejRoi:
                     shape=self.n_coordinates,
                     dtype=self.byteorder + 'u4',
                     buffer=data,
-                    offset=counters_offset
+                    offset=counters_offset,
                 )
                 self.counters = (counters & 0xFF).astype('u1')
                 self.counter_positions = counters >> 8
@@ -421,9 +482,11 @@ class ImagejRoi:
             self.text_style = style_and_justification & 255
             self.text_justification = (style_and_justification >> 8) & 3
             off = 80
-            self.text_name = data[off: off+name_length*2].decode(self.utf16)
+            self.text_name = data[off : off + name_length * 2].decode(
+                self.utf16
+            )
             off += name_length * 2
-            self.text = data[off: off+text_length*2].decode(self.utf16)
+            self.text = data[off : off + text_length * 2].decode(self.utf16)
 
         elif self.roitype in (
             ROI_TYPE.POLYGON,
@@ -432,14 +495,14 @@ class ImagejRoi:
             ROI_TYPE.POLYLINE,
             ROI_TYPE.FREELINE,
             ROI_TYPE.ANGLE,
-            ROI_TYPE.POINT
+            ROI_TYPE.POINT,
         ):
             self.integer_coordinates = numpy.ndarray(
                 shape=(self.n_coordinates, 2),
                 dtype=self.byteorder + 'i2',
                 buffer=data,
                 offset=64,
-                order='F'
+                order='F',
             ).copy()
 
             if self.subpixelresolution:
@@ -448,7 +511,7 @@ class ImagejRoi:
                     dtype=self.byteorder + 'f4',
                     buffer=data,
                     offset=64 + self.n_coordinates * 4,
-                    order='F'
+                    order='F',
                 ).copy()
 
         elif self.composite and self.roitype == ROI_TYPE.RECT:
@@ -456,7 +519,7 @@ class ImagejRoi:
                 shape=self.shape_roi_size,
                 dtype=self.byteorder + 'f4',
                 buffer=data,
-                offset=64
+                offset=64,
             ).copy()
 
         elif self.roitype not in (ROI_TYPE.RECT, ROI_TYPE.LINE, ROI_TYPE.OVAL):
@@ -465,14 +528,13 @@ class ImagejRoi:
         return self
 
     def tofile(self, filename, name=None, mode=None):
-        """Write ImagejRoi to a ROI or ZIP file.
+        """Write ImagejRoi to ROI or ZIP file.
 
         Existing ZIP files are opened for append.
 
         """
         filename = os.fspath(filename)
         if filename[-4:].lower() == '.zip':
-            import zipfile
             if name is None:
                 name = self.name if self.name else self.autoname
             if name[-4:].lower() != '.roi':
@@ -499,8 +561,9 @@ class ImagejRoi:
                 self.left,
                 self.bottom,
                 self.right,
-                self.n_coordinates if self.n_coordinates < 2**16 else 0
-            ))
+                self.n_coordinates if self.n_coordinates < 2 ** 16 else 0,
+            )
+        )
 
         if self.subpixelrect:
             result.append(
@@ -509,23 +572,26 @@ class ImagejRoi:
                     self.xd,
                     self.yd,
                     self.widthd,
-                    self.heightd
-                ))
+                    self.heightd,
+                )
+            )
         elif (
-            self.roitype == ROI_TYPE.LINE or
-            self.roitype == ROI_TYPE.FREEHAND and (
-                self.subtype == ROI_SUBTYPE.ELLIPSE or
-                self.subtype == ROI_SUBTYPE.ROTATED_RECT)
+            self.roitype == ROI_TYPE.LINE
+            or self.roitype == ROI_TYPE.FREEHAND
+            and (
+                self.subtype == ROI_SUBTYPE.ELLIPSE
+                or self.subtype == ROI_SUBTYPE.ROTATED_RECT
+            )
         ):
             result.append(
                 struct.pack(
-                    self.byteorder + 'ffff',
-                    self.x1, self.y1, self.x2, self.y2)
+                    self.byteorder + 'ffff', self.x1, self.y1, self.x2, self.y2
+                )
             )
-        elif self.n_coordinates >= 2**16:
-            result.append(struct.pack(
-                self.byteorder + 'i12x', self.n_coordinates
-            ))
+        elif self.n_coordinates >= 2 ** 16:
+            result.append(
+                struct.pack(self.byteorder + 'i12x', self.n_coordinates)
+            )
         else:
             result.append(b'\x00' * 16)
 
@@ -542,7 +608,8 @@ class ImagejRoi:
                 self.arrow_head_size,
                 self.rounded_rect_arc_size,
                 self.position,
-            ))
+            )
+        )
 
         extradata = b''
 
@@ -554,7 +621,7 @@ class ImagejRoi:
                 self.text_size,
                 style_and_justification,
                 len(self.text_name),
-                len(self.text)
+                len(self.text),
             )
             extradata += self.text_name.encode(self.utf16)
             extradata += self.text.encode(self.utf16)
@@ -567,7 +634,7 @@ class ImagejRoi:
             ROI_TYPE.POLYLINE,
             ROI_TYPE.FREELINE,
             ROI_TYPE.ANGLE,
-            ROI_TYPE.POINT
+            ROI_TYPE.POINT,
         ):
             if self.integer_coordinates is not None:
                 coord = self.integer_coordinates.astype(self.byteorder + 'i2')
@@ -603,14 +670,15 @@ class ImagejRoi:
                 name_length,
                 self.overlay_label_color,
                 self.overlay_font_size,
-                0,  # available_byte1,
+                self.group,
                 self.image_opacity,
                 self.image_size,
                 self.float_stroke_width,
                 roi_props_offset,
                 roi_props_length,
                 counters_offset,
-            ))
+            )
+        )
 
         if name_length > 0:
             result.append(self.name.encode(self.utf16))
@@ -644,13 +712,16 @@ class ImagejRoi:
                 fig.suptitle(title)
             if bounds and rois is None:
                 ax.set_title(f'{roitype.name} {subtype.name}')
-                ax.add_patch(Rectangle(
-                    (self.left, self.top),
-                    self.right - self.left,
-                    self.bottom - self.top,
-                    linewidth=1,
-                    edgecolor='0.9',
-                    facecolor='none'))
+                ax.add_patch(
+                    Rectangle(
+                        (self.left, self.top),
+                        self.right - self.left,
+                        self.bottom - self.top,
+                        linewidth=1,
+                        edgecolor='0.9',
+                        facecolor='none',
+                    )
+                )
         else:
             fig = None
 
@@ -665,6 +736,7 @@ class ImagejRoi:
         if 'color' not in kwargs and 'c' not in kwargs:
             kwargs['color'] = self.hexcolor(self.stroke_color)
         if 'linewidth' not in kwargs and 'lw' not in kwargs:
+            # TODO: use data units
             if self.float_stroke_width > 0.0:
                 kwargs['linewidth'] = self.float_stroke_width
             elif self.stroke_width > 0.0:
@@ -720,12 +792,14 @@ class ImagejRoi:
             coords = oval([[self.left, self.top], [self.right, self.bottom]])
         elif self.roitype == ROI_TYPE.RECT:
             coords = numpy.array(
-                [[self.left, self.top],
-                 [self.left, self.bottom],
-                 [self.right, self.bottom],
-                 [self.right, self.top],
-                 [self.left, self.top]],
-                'f4'
+                [
+                    [self.left, self.top],
+                    [self.left, self.bottom],
+                    [self.right, self.bottom],
+                    [self.right, self.top],
+                    [self.left, self.top],
+                ],
+                'f4',
             )
         else:
             coords = numpy.empty((0, 2), dtype=self.byteorder + 'i4')
@@ -767,7 +841,8 @@ class ImagejRoi:
             elif op == 2 or op == 3:
                 # QUADTO or CUBICTO
                 raise NotImplementedError(
-                    f'PathIterator command {op!r} not supported')
+                    f'PathIterator command {op!r} not supported'
+                )
             else:
                 raise RuntimeError(f'invalid PathIterator command {op!r}')
 
@@ -781,26 +856,25 @@ class ImagejRoi:
     @property
     def subpixelresolution(self):
         return (
-            self.version >= 222 and
-            self.options & ROI_OPTIONS.SUB_PIXEL_RESOLUTION
+            self.version >= 222
+            and self.options & ROI_OPTIONS.SUB_PIXEL_RESOLUTION
         )
 
     @property
     def drawoffset(self):
         return (
-            self.subpixelresolution and
-            self.options & ROI_OPTIONS.DRAW_OFFSET
+            self.subpixelresolution and self.options & ROI_OPTIONS.DRAW_OFFSET
         )
 
     @property
     def subpixelrect(self):
         return (
-            self.version >= 223 and
-            self.subpixelresolution and
-            (
-                self.roitype == ROI_TYPE.RECT or
-                self.roitype == ROI_TYPE.OVAL
-            ))
+            self.version >= 223
+            and self.subpixelresolution
+            and (
+                self.roitype == ROI_TYPE.RECT or self.roitype == ROI_TYPE.OVAL
+            )
+        )
 
     @property
     def autoname(self):
@@ -827,8 +901,9 @@ class ImagejRoi:
 
     def __str__(self):
         """Return string with information about ImagejRoi."""
-        return '\n'.join(f' {name} = {value!r}'
-                         for name, value in self.__dict__.items())
+        return '\n'.join(
+            f' {name} = {value!r}' for name, value in self.__dict__.items()
+        )
 
 
 def oval(rect, points=33, dtype='float32'):
@@ -846,6 +921,7 @@ def oval(rect, points=33, dtype='float32'):
 def log_warning(msg, *args, **kwargs):
     """Log message with level WARNING."""
     import logging
+
     logging.getLogger(__name__).warning(msg, *args, **kwargs)
 
 
@@ -864,12 +940,11 @@ def test_imagejroi():
         os.remove('_test.zip')
     except OSError:
         pass
-    for roi in rois:
-        roi.tofile('_test.zip')
-    assert ImagejRoi.fromfile('_test.zip')[-1] == rois[-1]
+    roiwrite('_test.zip', rois)
+    assert roiread('_test.zip') == rois
 
     # verify box_combined
-    roi = ImagejRoi.fromfile('tests/box_combined.roi')
+    roi = roiread('tests/box_combined.roi')
     assert roi.tobytes() == ImagejRoi.frombytes(roi.tobytes()).tobytes()
     assert roi.name == '0464-0752'
     assert roi.roitype == ROI_TYPE.RECT
@@ -883,7 +958,7 @@ def test_imagejroi():
     roi.__str__()
 
     # read a ROI from a TIFF file
-    for roi in ImagejRoi.fromfile('tests/IJMetadata.tif'):
+    for roi in roiread('tests/IJMetadata.tif'):
         assert roi == ImagejRoi.frombytes(roi.tobytes())
         roi.coordinates()
         roi.__str__()
@@ -908,6 +983,7 @@ def main(argv=None, test=False):
         if os.path.exists('../tests'):
             os.chdir('../')
         import doctest
+
         try:
             import roifile.roifile as m
         except ImportError:
