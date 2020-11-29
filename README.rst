@@ -15,17 +15,24 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.8.13
+:Version: 2020.11.28
 
 Requirements
 ------------
-* `CPython >= 3.7 <https://www.python.org>`_
-* `Numpy 1.15.1 <https://www.numpy.org>`_
-* `Tifffile 2020.8.13 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.2 <https://pypi.org/project/matplotlib/>`_  (optional)
+This release has been tested with the following requirements and dependencies
+(other versions may work):
+
+* `CPython 3.7.9, 3.8.6, 3.9.0 64-bit <https://www.python.org>`_
+* `Numpy 1.19.4 <https://pypi.org/project/numpy/>`_
+* `Tifffile 2020.11.26 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2020.11.28
+    Support group attribute.
+    Add roiread and roiwrite functions (#3).
+    Use UUID as default name of ROI in ImagejRoi.frompoints (#2).
 2020.8.13
     Support writing to ZIP file.
     Support os.PathLike file names.
@@ -62,7 +69,7 @@ array([[1.1, 2.2],
 >>> roi.left, roi.left, roi.right, roi.bottom
 (1, 1, 5, 6)
 
-Export the instance to an ImageJ ROI formatted bytes or file:
+Export the instance to an ImageJ ROI formatted byte string or file:
 
 >>> out = roi.tobytes()
 >>> out[:4]
