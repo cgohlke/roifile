@@ -1,6 +1,6 @@
 # roifile.py
 
-# Copyright (c) 2020, Christoph Gohlke
+# Copyright (c) 2020-2021, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -45,20 +45,22 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.11.28
+:Version: 2021.6.6
 
 Requirements
 ------------
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-* `CPython 3.7.9, 3.8.6, 3.9.0 64-bit <https://www.python.org>`_
-* `Numpy 1.19.4 <https://pypi.org/project/numpy/>`_
-* `Tifffile 2020.11.26 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+* `CPython 3.7.9, 3.8.10, 3.9.5 64-bit <https://www.python.org>`_
+* `Numpy 1.20.3 <https://pypi.org/project/numpy/>`_
+* `Tifffile 2021.4.8 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.4.2 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2021.6.6
+    Add enums for point types and sizes.
 2020.11.28
     Support group attribute.
     Add roiread and roiwrite functions (#3).
@@ -77,7 +79,6 @@ Revisions
 
 Notes
 -----
-
 The ImageJ ROI format cannot store integer coordinate values outside the
 range of -32768 to 32767 (16-bit signed).
 
@@ -88,7 +89,6 @@ Other Python packages handling ImageJ ROIs:
 
 Examples
 --------
-
 Create a new ImagejRoi instance from an array of x, y coordinates:
 
 >>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.4, 6.6]])
@@ -121,7 +121,7 @@ run ``python -m roifile _test.roi``.
 
 """
 
-__version__ = '2020.11.28'
+__version__ = '2021.6.6'
 
 __all__ = (
     'roiread',
@@ -130,6 +130,8 @@ __all__ = (
     'ROI_TYPE',
     'ROI_SUBTYPE',
     'ROI_OPTIONS',
+    'ROI_POINT_TYPE',
+    'ROI_POINT_SIZE',
 )
 
 import enum
@@ -212,6 +214,24 @@ class ROI_OPTIONS(enum.IntFlag):
     SHOW_LABELS = 1024
     SCALE_LABELS = 2048
     PROMPT_BEFORE_DELETING = 4096
+
+
+class ROI_POINT_TYPE(enum.IntEnum):
+    HYBRID = 0
+    CROSS = 1
+    # CROSSHAIR = 1
+    DOT = 2
+    CIRCLE = 3
+
+
+class ROI_POINT_SIZE(enum.IntEnum):
+    TINY = 1
+    SMALL = 3
+    MEDIUM = 5
+    LARGE = 7
+    EXTRA_LARGE = 11
+    XXL = 17
+    XXXL = 25
 
 
 ROI_COLOR_NONE = b'\x00\x00\x00\x00'
@@ -318,7 +338,7 @@ class ImagejRoi:
 
         if self.subpixelresolution:
             self.integer_coordinates = numpy.array(
-                points - [int(left), int(top)], dtype='i4'
+                points - [int(left), int(top)], dtype='i2'
             )
             self.subpixel_coordinates = points
         else:
@@ -375,9 +395,7 @@ class ImagejRoi:
 
     @classmethod
     def frombytes(cls, data):
-        """Return ImagejRoi instance from bytes.
-
-        """
+        """Return ImagejRoi instance from bytes."""
         if data[:4] != b'Iout':
             raise ValueError('not an ImageJ ROI')
 
@@ -685,9 +703,13 @@ class ImagejRoi:
         if roi_props_length > 0:
             result.append(self.props.encode(self.utf16))
         if self.counters is not None:
-            counters = self.counters.astype(self.byteorder + 'u4')
+            counters = numpy.asarray(
+                self.counters, dtype=self.byteorder + 'u4'
+            )
             if self.counter_positions is not None:
-                indices = self.counter_positions.astype(self.byteorder + 'u4')
+                indices = numpy.asarray(
+                    self.counter_positions, dtype=self.byteorder + 'u4'
+                )
                 counters = counters & 0xFF | indices << 8
                 counters = counters.astype(self.byteorder + 'u4')
             result.append(counters.tobytes())
