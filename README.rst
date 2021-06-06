@@ -15,20 +15,22 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2020.11.28
+:Version: 2021.6.6
 
 Requirements
 ------------
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-* `CPython 3.7.9, 3.8.6, 3.9.0 64-bit <https://www.python.org>`_
-* `Numpy 1.19.4 <https://pypi.org/project/numpy/>`_
-* `Tifffile 2020.11.26 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+* `CPython 3.7.9, 3.8.10, 3.9.5 64-bit <https://www.python.org>`_
+* `Numpy 1.20.3 <https://pypi.org/project/numpy/>`_
+* `Tifffile 2021.4.8 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.4.2 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2021.6.6
+    Add enums for point types and sizes.
 2020.11.28
     Support group attribute.
     Add roiread and roiwrite functions (#3).
@@ -47,7 +49,6 @@ Revisions
 
 Notes
 -----
-
 The ImageJ ROI format cannot store integer coordinate values outside the
 range of -32768 to 32767 (16-bit signed).
 
@@ -58,7 +59,6 @@ Other Python packages handling ImageJ ROIs:
 
 Examples
 --------
-
 Create a new ImagejRoi instance from an array of x, y coordinates:
 
 >>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.4, 6.6]])
