@@ -15,7 +15,7 @@ version = re.search(r"__version__ = '(.*?)'", code).groups()[0]
 description = re.search(r'"""(.*)\.(?:\r\n|\r|\n)', code).groups()[0]
 
 readme = re.search(
-    r'(?:\r\n|\r|\n){2}"""(.*)"""(?:\r\n|\r|\n){2}__version__',
+    r'(?:\r\n|\r|\n){2}"""(.*)"""(?:\r\n|\r|\n){2}[__version__|from]',
     code,
     re.MULTILINE | re.DOTALL,
 ).groups()[0]
@@ -55,9 +55,9 @@ setup(
     },
     packages=['roifile'],
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
-    python_requires='>=3.7',
-    install_requires=['numpy>=1.15.1'],
-    extras_require={'all': ['matplotlib>=3.2', 'tifffile>=2020.6.3']},
+    python_requires='>=3.8',
+    install_requires=['numpy>=1.19.2'],
+    extras_require={'all': ['matplotlib>=3.3', 'tifffile>=2021.11.2']},
     platforms=['any'],
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -66,7 +66,6 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
