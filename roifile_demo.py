@@ -28,6 +28,8 @@ def plot_image_overlays(image, overlays, **kwargs):
 
 
 # open an ImageJ TIFF file and read the image and overlay data
+# https://github.com/csachs/imagej-tiff-meta/
+# blob/b6a74daa8c2adf7023d20a447d9a2799614c857a/box.tif
 with TiffFile('tests/box.tif') as tif:
     image = tif.pages[0].asarray()
     overlays = tif.imagej_metadata['Overlays']
