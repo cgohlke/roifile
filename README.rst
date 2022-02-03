@@ -15,20 +15,24 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2021.6.6
+:Version: 2022.2.2
 
 Requirements
 ------------
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-* `CPython 3.7.9, 3.8.10, 3.9.5 64-bit <https://www.python.org>`_
-* `Numpy 1.20.3 <https://pypi.org/project/numpy/>`_
-* `Tifffile 2021.4.8 <https://pypi.org/project/tifffile/>`_  (optional)
-* `Matplotlib 3.4.2 <https://pypi.org/project/matplotlib/>`_  (optional)
+* `CPython 3.8.10, 3.9.10, 3.10.2 64-bit <https://www.python.org>`_
+* `Numpy 1.21.5 <https://pypi.org/project/numpy/>`_
+* `Tifffile 2021.11.2 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Matplotlib 3.4.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2022.2.2
+    Add type hints.
+    Change ImagejRoi to dataclass.
+    Drop support for Python 3.7 and numpy < 1.19 (NEP29).
 2021.6.6
     Add enums for point types and sizes.
 2020.11.28
