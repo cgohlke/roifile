@@ -15,20 +15,23 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2022.2.2
+:Version: 2022.3.18
 
 Requirements
 ------------
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-* `CPython 3.8.10, 3.9.10, 3.10.2 64-bit <https://www.python.org>`_
+* `CPython 3.8.10, 3.9.11, 3.10.3 64-bit <https://www.python.org>`_
 * `Numpy 1.21.5 <https://pypi.org/project/numpy/>`_
-* `Tifffile 2021.11.2 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2022.3.16 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.4.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2022.3.18
+    Fix creating ROIs from float coordinates exceeding int16 range (#7).
+    Fix bottom-right bounds in ImagejRoi.frompoints.
 2022.2.2
     Add type hints.
     Change ImagejRoi to dataclass.
@@ -65,13 +68,9 @@ Examples
 --------
 Create a new ImagejRoi instance from an array of x, y coordinates:
 
->>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.4, 6.6]])
->>> roi.coordinates()
-array([[1.1, 2.2],
-       [3.3, 4.4],
-       [5.4, 6.6]], dtype=float32)
->>> roi.left, roi.left, roi.right, roi.bottom
-(1, 1, 5, 6)
+>>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
+>>> roi.roitype = ROI_TYPE.POINT
+>>> roi.options |= ROI_OPTIONS.SHOW_LABELS
 
 Export the instance to an ImageJ ROI formatted byte string or file:
 
@@ -80,11 +79,21 @@ Export the instance to an ImageJ ROI formatted byte string or file:
 b'Iout'
 >>> roi.tofile('_test.roi')
 
-Read the ImageJ ROI from the file:
+Read the ImageJ ROI from the file and verify the content:
 
 >>> roi2 = ImagejRoi.fromfile('_test.roi')
 >>> roi2 == roi
 True
+>>> roi.roitype == ROI_TYPE.POINT
+True
+>>> roi.subpixelresolution
+True
+>>> roi.coordinates()
+array([[1.1, 2.2],
+       [3.3, 4.4],
+       [5.5, 6.6]], dtype=float32)
+>>> roi.left, roi.top, roi.right, roi.bottom
+(1, 2, 7, 8)
 
 Plot the ROI using matplotlib:
 
