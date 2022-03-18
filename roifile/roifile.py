@@ -45,20 +45,23 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :License: BSD 3-Clause
 
-:Version: 2022.2.2
+:Version: 2022.3.18
 
 Requirements
 ------------
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-* `CPython 3.8.10, 3.9.10, 3.10.2 64-bit <https://www.python.org>`_
+* `CPython 3.8.10, 3.9.11, 3.10.3 64-bit <https://www.python.org>`_
 * `Numpy 1.21.5 <https://pypi.org/project/numpy/>`_
-* `Tifffile 2021.11.2 <https://pypi.org/project/tifffile/>`_  (optional)
+* `Tifffile 2022.3.16 <https://pypi.org/project/tifffile/>`_  (optional)
 * `Matplotlib 3.4.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+2022.3.18
+    Fix creating ROIs from float coordinates exceeding int16 range (#7).
+    Fix bottom-right bounds in ImagejRoi.frompoints.
 2022.2.2
     Add type hints.
     Change ImagejRoi to dataclass.
@@ -95,13 +98,9 @@ Examples
 --------
 Create a new ImagejRoi instance from an array of x, y coordinates:
 
->>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.4, 6.6]])
->>> roi.coordinates()
-array([[1.1, 2.2],
-       [3.3, 4.4],
-       [5.4, 6.6]], dtype=float32)
->>> roi.left, roi.left, roi.right, roi.bottom
-(1, 1, 5, 6)
+>>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
+>>> roi.roitype = ROI_TYPE.POINT
+>>> roi.options |= ROI_OPTIONS.SHOW_LABELS
 
 Export the instance to an ImageJ ROI formatted byte string or file:
 
@@ -110,11 +109,21 @@ Export the instance to an ImageJ ROI formatted byte string or file:
 b'Iout'
 >>> roi.tofile('_test.roi')
 
-Read the ImageJ ROI from the file:
+Read the ImageJ ROI from the file and verify the content:
 
 >>> roi2 = ImagejRoi.fromfile('_test.roi')
 >>> roi2 == roi
 True
+>>> roi.roitype == ROI_TYPE.POINT
+True
+>>> roi.subpixelresolution
+True
+>>> roi.coordinates()
+array([[1.1, 2.2],
+       [3.3, 4.4],
+       [5.5, 6.6]], dtype=float32)
+>>> roi.left, roi.top, roi.right, roi.bottom
+(1, 2, 7, 8)
 
 Plot the ROI using matplotlib:
 
@@ -127,7 +136,7 @@ run ``python -m roifile _test.roi``.
 
 from __future__ import annotations
 
-__version__ = '2022.2.2'
+__version__ = '2022.3.18'
 
 __all__ = [
     'roiread',
@@ -281,10 +290,10 @@ class ImagejRoi:
     c_position: int = 0
     z_position: int = 0
     t_position: int = 0
-    x1: int = 0
-    y1: int = 0
-    x2: int = 0
-    y2: int = 0
+    x1: float = 0
+    y1: float = 0
+    x2: float = 0
+    y2: float = 0
     xd: float = 0.0
     yd: float = 0.0
     widthd: float = 0.0
@@ -317,7 +326,15 @@ class ImagejRoi:
         z: int | None = None,
         t: int | None = None,
     ) -> ImagejRoi:
-        """Return ImagejRoi instance from sequence of Point coordinates."""
+        """Return ImagejRoi instance from sequence of Point coordinates.
+
+        Use floating point coordinates for subpixel precision or values outside
+        the range of -32768 to 32767 (16-bit signed).
+
+        A FREEHAND ROI with options OVERLAY_BACKGROUNDS and OVERLAY_LABELS is
+        returned.
+
+        """
         if points is None:
             return cls()
 
@@ -346,28 +363,25 @@ class ImagejRoi:
 
         coords = numpy.array(points, copy=True)
         if coords.dtype.kind == 'f':
-            coords = coords.astype('f4', copy=False)
             self.options |= ROI_OPTIONS.SUB_PIXEL_RESOLUTION
-        else:
-            coords = numpy.array(coords, dtype='i4')
+            self.subpixel_coordinates = coords.astype('f4', copy=True)
+            coords = numpy.round(coords)
 
-        left, top = coords.min(axis=0)
-        right, bottom = coords.max(axis=0)
+        left_top = coords.min(axis=0)
+        right_bottom = coords.max(axis=0)
+        right_bottom += [1, 1]
 
-        if self.subpixelresolution:
-            self.integer_coordinates = numpy.array(
-                coords - [int(left), int(top)], dtype='i2'
-            )
-            self.subpixel_coordinates = coords
-        else:
-            coords -= [int(left), int(top)]
-            self.integer_coordinates = coords
-
+        coords = numpy.array(coords, dtype='i4')
+        coords -= left_top.astype('i4')
+        self.integer_coordinates = numpy.array(coords, dtype='i2')
         self.n_coordinates = len(self.integer_coordinates)
-        self.left = int(left)
-        self.top = int(top)
-        self.right = int(right)
-        self.bottom = int(bottom)
+
+        left_top = left_top.astype('i2')
+        right_bottom = right_bottom.astype('i2')
+        self.left = int(left_top[0])
+        self.top = int(left_top[1])
+        self.right = int(right_bottom[0])
+        self.bottom = int(right_bottom[1])
 
         return self
 
@@ -822,8 +836,21 @@ class ImagejRoi:
             for coords in self.coordinates(multi=True):
                 ax.plot(coords[:, 0], coords[:, 1], **kwargs)
 
-        ax.plot(self.left, self.bottom, '')
-        ax.plot(self.right, self.top, '')
+        # integer limits might be bogus
+        if (
+            self.left < self.right
+            and self.top < self.bottom
+            and self.left > -256
+            and self.left < 24576
+            and self.bottom > -256
+            and self.bottom < 24576
+            and self.right > -256
+            and self.right < 24576
+            and self.top > -256
+            and self.top < 24576
+        ):
+            ax.plot(self.left, self.bottom, '')
+            ax.plot(self.right, self.top, '')
 
         if fig is not None:
             pyplot.show()
@@ -1031,6 +1058,32 @@ def test(verbose: bool = False) -> None:
     assert roi.multi_coordinates is not None
     assert roi.multi_coordinates[0] == 0.0
     roi.__str__()
+
+    roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
+    assert roi.left == 1
+    assert roi.top == 2
+    assert roi.right == 6
+    assert roi.bottom == 7
+
+    roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
+    assert roi.left == 1
+    assert roi.top == 2
+    assert roi.right == 7
+    assert roi.bottom == 8
+
+    # issue #7
+    roi = ImagejRoi.frompoints(numpy.load('tests/issue7.npy').astype('f4'))
+    assert roi.left == 28357
+    assert roi.top == -23336
+    assert roi.right == 28453
+    assert roi.bottom == -23252
+    coords = roi.coordinates()
+    assert roi.integer_coordinates is not None
+    assert roi.subpixel_coordinates is not None
+    assert roi.integer_coordinates[0, 0] == 0
+    assert roi.integer_coordinates[0, 1] == 15
+    assert roi.subpixel_coordinates[0, 0] == 28357.0
+    assert roi.subpixel_coordinates[0, 1] == 42215.0
 
     # read a ROI from a TIFF file
     rois = roiread('tests/IJMetadata.tif')
