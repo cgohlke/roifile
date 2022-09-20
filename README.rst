@@ -9,7 +9,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2022.7.29
+:Version: 2022.9.19
 :DOI: 10.5281/zenodo.6941603
 
 Installation
@@ -26,13 +26,18 @@ Requirements
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.5, 3.11.0b5 <https://www.python.org>`_
-- `Numpy 1.21.5 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2022.7.28 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.4.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
+- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
+- `Tifffile 2022.8.12 <https://pypi.org/project/tifffile/>`_  (optional)
+- `Matplotlib 3.5.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+
+2022.9.19
+
+- Fix integer coordinates to -5000..60536 conforming with ImageJ (breaking).
+- Add subpixel_coordinates in frompoints for out-of-range integer coordinates.
 
 2022.7.29
 
@@ -128,4 +133,4 @@ Plot the ROI using matplotlib:
 
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
-    python -m roifile _test.roi
+    $ python -m roifile _test.roi
