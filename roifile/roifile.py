@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2022.7.29
+:Version: 2022.9.19
 :DOI: 10.5281/zenodo.6941603
 
 Installation
@@ -56,13 +56,18 @@ Requirements
 This release has been tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.5, 3.11.0b5 <https://www.python.org>`_
-- `Numpy 1.21.5 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2022.7.28 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.4.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
+- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
+- `Tifffile 2022.8.12 <https://pypi.org/project/tifffile/>`_  (optional)
+- `Matplotlib 3.5.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+
+2022.9.19
+
+- Fix integer coordinates to -5000..60536 conforming with ImageJ (breaking).
+- Add subpixel_coordinates in frompoints for out-of-range integer coordinates.
 
 2022.7.29
 
@@ -158,13 +163,13 @@ Plot the ROI using matplotlib:
 
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
-    python -m roifile _test.roi
+    $ python -m roifile _test.roi
 
 """
 
 from __future__ import annotations
 
-__version__ = '2022.7.29'
+__version__ = '2022.9.19'
 
 __all__ = [
     'roiread',
@@ -196,19 +201,22 @@ except ImportError:
 ZipFileMode = Union[Literal['r'], Literal['w'], Literal['x'], Literal['a']]
 
 
-def roiread(filename: os.PathLike | str, /) -> ImagejRoi | list[ImagejRoi]:
+def roiread(
+    filename: os.PathLike | str, /, *, min_int_coord: int | None = None
+) -> ImagejRoi | list[ImagejRoi]:
     """Return ImagejRoi instance(s) from ROI, ZIP, or TIFF file.
 
     For ZIP or TIFF files, return a list of ImagejRoi.
 
     """
-    return ImagejRoi.fromfile(filename)
+    return ImagejRoi.fromfile(filename, min_int_coord=min_int_coord)
 
 
 def roiwrite(
     filename: os.PathLike | str,
     roi: ImagejRoi | Iterable[ImagejRoi],
     /,
+    *,
     name: str | Iterable[str] | None = None,
     mode: ZipFileMode | None = None,
 ) -> None:
@@ -353,6 +361,8 @@ class ImagejRoi:
     def frompoints(
         cls,
         points: ArrayLike | None = None,
+        /,
+        *,
         name: str | None = None,
         position: int | None = None,
         index: int | str | None = None,
@@ -363,7 +373,7 @@ class ImagejRoi:
         """Return ImagejRoi instance from sequence of Point coordinates.
 
         Use floating point coordinates for subpixel precision or values outside
-        the range of -32768 to 32767 (16-bit signed).
+        the range -5000..60536.
 
         A FREEHAND ROI with options OVERLAY_BACKGROUNDS and OVERLAY_LABELS is
         returned.
@@ -396,22 +406,23 @@ class ImagejRoi:
         self.name = name
 
         coords = numpy.array(points, copy=True)
-        if coords.dtype.kind == 'f':
+        if coords.dtype.kind == 'f' or (
+            numpy.any(coords > 60000) or numpy.any(coords < -5000)
+        ):
             self.options |= ROI_OPTIONS.SUB_PIXEL_RESOLUTION
             self.subpixel_coordinates = coords.astype('f4', copy=True)
-            coords = numpy.round(coords)
+            if coords.dtype.kind == 'f':
+                coords = numpy.round(coords)
+
+        coords = numpy.array(coords, dtype='i4')
 
         left_top = coords.min(axis=0)
         right_bottom = coords.max(axis=0)
         right_bottom += [1, 1]
 
-        coords = numpy.array(coords, dtype='i4')
-        coords -= left_top.astype('i4')
-        self.integer_coordinates = numpy.array(coords, dtype='i2')
+        coords -= left_top
+        self.integer_coordinates = coords
         self.n_coordinates = len(self.integer_coordinates)
-
-        left_top = left_top.astype('i2')
-        right_bottom = right_bottom.astype('i2')
         self.left = int(left_top[0])
         self.top = int(left_top[1])
         self.right = int(right_bottom[0])
@@ -421,7 +432,11 @@ class ImagejRoi:
 
     @classmethod
     def fromfile(
-        cls, filename: os.PathLike | str
+        cls,
+        filename: os.PathLike | str,
+        /,
+        *,
+        min_int_coord: int | None = None,
     ) -> ImagejRoi | list[ImagejRoi]:
         """Return ImagejRoi instance from ROI, ZIP, or TIFF file.
 
@@ -448,21 +463,32 @@ class ImagejRoi:
                         overlays.extend(roi)
                     else:
                         rois.append(roi)
-                return [cls.frombytes(roi) for roi in rois]
+                return [
+                    cls.frombytes(roi, min_int_coord=min_int_coord)
+                    for roi in rois
+                ]
 
         if filename[-4:].lower() == '.zip':
             with zipfile.ZipFile(filename) as zf:
                 return [
-                    cls.frombytes(zf.open(name).read())
+                    cls.frombytes(
+                        zf.open(name).read(), min_int_coord=min_int_coord
+                    )
                     for name in zf.namelist()
                 ]
 
         with open(filename, 'rb') as fh:
             data = fh.read()
-        return cls.frombytes(data)
+        return cls.frombytes(data, min_int_coord=min_int_coord)
 
     @classmethod
-    def frombytes(cls, data: bytes) -> ImagejRoi:
+    def frombytes(
+        cls,
+        data: bytes,
+        /,
+        *,
+        min_int_coord: int | None = None,
+    ) -> ImagejRoi:
         """Return ImagejRoi instance from bytes."""
         if data[:4] != b'Iout':
             raise ValueError('not an ImageJ ROI')
@@ -492,6 +518,22 @@ class ImagejRoi:
         ) = struct.unpack(
             self.byteorder + 'hBxhhhhH16xhi4s4shhBBhii', data[4:64]
         )
+
+        min_int_coord = ImagejRoi.min_int_coord(min_int_coord)
+
+        if self.top < min_int_coord:
+            self.top += 65536
+        if self.bottom < min_int_coord:
+            self.bottom += 65536
+        if self.bottom < 0 and self.bottom < self.top:
+            self.bottom += 65536
+
+        if self.left < min_int_coord:
+            self.left += 65536
+        if self.right < min_int_coord:
+            self.right += 65536
+        if self.right < 0 and self.right < self.left:
+            self.right += 65536
 
         self.roitype = ROI_TYPE(roitype)
         self.subtype = ROI_SUBTYPE(subtype)
@@ -589,7 +631,10 @@ class ImagejRoi:
                 buffer=data,
                 offset=64,
                 order='F',
-            ).copy()
+            ).astype('i4')
+
+            select = self.integer_coordinates < min_int_coord
+            self.integer_coordinates[select] += 65536
 
             if self.subpixelresolution:
                 self.subpixel_coordinates = numpy.ndarray(
@@ -648,10 +693,10 @@ class ImagejRoi:
                 self.byteorder + 'hBxhhhhH',
                 self.version,
                 self.roitype.value,
-                self.top,
-                self.left,
-                self.bottom,
-                self.right,
+                numpy.array(self.top, 'i2'),
+                numpy.array(self.left, 'i2'),
+                numpy.array(self.bottom, 'i2'),
+                numpy.array(self.right, 'i2'),
                 self.n_coordinates if self.n_coordinates < 2**16 else 0,
             )
         )
@@ -793,9 +838,11 @@ class ImagejRoi:
     def plot(
         self,
         ax: Any | None = None,
+        *,
         rois: Iterable[ImagejRoi] | None = None,
         title: str | None = None,
         bounds: bool = False,
+        invert_yaxis: bool | None = None,
         **kwargs,
     ) -> None:
         """Plot coordinates using matplotlib."""
@@ -825,12 +872,18 @@ class ImagejRoi:
                         facecolor='none',
                     )
                 )
+            if invert_yaxis is None:
+                invert_yaxis = True
         else:
             fig = None
+            if invert_yaxis is None:
+                invert_yaxis = False
 
         if rois is not None:
             for roi in rois:
                 roi.plot(ax=ax, **kwargs)
+            if invert_yaxis:
+                ax.invert_yaxis()
             pyplot.show()
             return
 
@@ -886,6 +939,9 @@ class ImagejRoi:
             ax.plot(self.left, self.bottom, '')
             ax.plot(self.right, self.top, '')
 
+        if invert_yaxis:
+            ax.invert_yaxis()
+
         if fig is not None:
             pyplot.show()
 
@@ -923,7 +979,7 @@ class ImagejRoi:
             coords = numpy.empty((0, 2), dtype=self.byteorder + 'i4')
         return [coords] if multi else coords
 
-    def hexcolor(self, b: bytes, default: str | None = None) -> str | None:
+    def hexcolor(self, b: bytes, /, default: str | None = None) -> str | None:
         """Return color (bytes) as hex triplet or None if black."""
         if b == ROI_COLOR_NONE:
             return default
@@ -932,7 +988,7 @@ class ImagejRoi:
         return f'#{b[3]:02x}{b[2]:02x}{b[1]:02x}'
 
     @staticmethod
-    def path2coords(path: numpy.ndarray) -> list[numpy.ndarray]:
+    def path2coords(path: numpy.ndarray, /) -> list[numpy.ndarray]:
         """Return list of coordinate arrays from 2D geometric path."""
         coordinates = []
         points: list[list[int | float]] = []
@@ -966,6 +1022,21 @@ class ImagejRoi:
 
         coordinates.append(numpy.array(points))
         return coordinates
+
+    @staticmethod
+    def min_int_coord(value: int | None = None) -> int:
+        """Return minimum integer coordinate value.
+
+        The default, -5000, is used by ImageJ.
+        A value of -32768 means to use int16 range, 0 means uint16 range.
+
+        """
+        if value is None:
+            return -5000
+        if -32768 <= value <= 0:
+            return int(value)
+        else:
+            raise ValueError('min_int_coord out of range')
 
     @property
     def composite(self) -> bool:
@@ -1012,21 +1083,25 @@ class ImagejRoi:
     def __eq__(self, other: object) -> bool:
         """Return True if two ImagejRoi are the same."""
         return (
-            isinstance(other, ImagejRoi) and self.tobytes() == other.tobytes()
+            isinstance(other, ImagejRoi)
+            and self.tobytes() == other.tobytes()
+            and self.left == other.left
+            and self.top == other.top
+            and self.right == other.right
+            and self.bottom == other.bottom
         )
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__} {self.name!r}>'
 
     def __str__(self) -> str:
-        """Return string with information about ImagejRoi."""
         return indent(
             repr(self),
             *(f'{name} = {value!r}' for name, value in self.__dict__.items()),
         )
 
 
-def oval(rect: ArrayLike, points: int = 33) -> numpy.ndarray:
+def oval(rect: ArrayLike, /, points: int = 33) -> numpy.ndarray:
     """Return coordinates of oval from rectangle corners."""
     arr = numpy.array(rect, dtype=numpy.float32)
     c = numpy.linspace(0.0, 2.0 * numpy.pi, num=points, dtype=numpy.float32)
@@ -1060,7 +1135,7 @@ def test(verbose: bool = False) -> None:
     assert isinstance(rois, list)
     assert len(rois) == 7
     for roi in rois:
-        assert roi.tobytes() == ImagejRoi.frombytes(roi.tobytes()).tobytes()
+        assert roi == ImagejRoi.frombytes(roi.tobytes())
         roi.coordinates()
         if verbose:
             print(roi)
@@ -1080,7 +1155,7 @@ def test(verbose: bool = False) -> None:
     roi = rois
     if verbose:
         print(roi)
-    assert roi.tobytes() == ImagejRoi.frombytes(roi.tobytes()).tobytes()
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.name == '0464-0752'
     assert roi.roitype == ROI_TYPE.RECT
     assert roi.version == 227
@@ -1094,23 +1169,33 @@ def test(verbose: bool = False) -> None:
     roi.__str__()
 
     roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.left == 1
     assert roi.top == 2
     assert roi.right == 6
     assert roi.bottom == 7
 
     roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.left == 1
     assert roi.top == 2
     assert roi.right == 7
     assert roi.bottom == 8
 
+    roi = ImagejRoi.frompoints([[-5000, 60535], [60534, 65534]])
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
+    assert roi.left == -5000, roi.left
+    assert roi.top == 60535, roi.top
+    assert roi.right == 60535, roi.right
+    assert roi.bottom == 65535, roi.bottom
+
     # issue #7
     roi = ImagejRoi.frompoints(numpy.load('tests/issue7.npy').astype('f4'))
-    assert roi.left == 28357
-    assert roi.top == -23336
-    assert roi.right == 28453
-    assert roi.bottom == -23252
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
+    assert roi.left == 28357, roi.left
+    assert roi.top == 42200, roi.top  # not -23336
+    assert roi.right == 28453, roi.right
+    assert roi.bottom == 42284, roi.bottom  # not -23252
     coords = roi.coordinates()
     assert roi.integer_coordinates is not None
     assert roi.subpixel_coordinates is not None
@@ -1135,9 +1220,9 @@ def test(verbose: bool = False) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Roifile command line usage main function.
 
-    Show all ImageJ ROIs in file or all files in directory:
+    Show all ImageJ ROIs in file or all files in directory::
 
-    ``python -m roifile file_or_directory``
+        $ python -m roifile file_or_directory
 
     """
     from glob import glob
@@ -1166,10 +1251,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if len(argv) == 1:
         files = glob('*.roi')
+        files += glob('*.zip')
+        files += glob('*.tif')
     elif '*' in argv[1]:
         files = glob(argv[1])
     elif os.path.isdir(argv[1]):
-        files = glob(f'{argv[1]}/*.roi')
+        files = []
+        for ext in ('roi', 'zip', 'tif'):
+            files += glob(f'{argv[1]}/*.{ext}')
     else:
         files = argv[1:]
 
@@ -1182,14 +1271,19 @@ def main(argv: list[str] | None = None) -> int:
                 for roi in rois:
                     print(roi)
                     print()
+                    if sys.flags.dev_mode:
+                        assert roi == ImagejRoi.frombytes(roi.tobytes())
                 if rois:
                     rois[0].plot(rois=rois, title=title)
             else:
                 print(rois)
                 print()
+                if sys.flags.dev_mode:
+                    assert rois == ImagejRoi.frombytes(rois.tobytes())
                 rois.plot(title=title)
         except ValueError as exc:
-            # raise  # enable for debugging
+            if sys.flags.dev_mode:
+                raise
             print(fname, exc)
             continue
     return 0
