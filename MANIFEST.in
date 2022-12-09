@@ -2,6 +2,12 @@ include LICENSE
 include README.rst
 include roifile_demo.py
 
+exclude *.cmd
+recursive-exclude doc *
+recursive-exclude docs *
+recursive-exclude test *
+recursive-exclude tests *
+
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * *Copy*
