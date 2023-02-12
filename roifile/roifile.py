@@ -1,6 +1,6 @@
 # roifile.py
 
-# Copyright (c) 2020-2022, Christoph Gohlke
+# Copyright (c) 2020-2023, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -39,30 +39,44 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2022.9.19
-:DOI: 10.5281/zenodo.6941603
+:Version: 2023.2.12
+:DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
-Installation
-------------
+Quickstart
+----------
 
-Install the roifile package and common dependencies from the
-Python Package Index::
+Install the roifile package and all dependencies from the
+`Python Package Index <https://pypi.org/project/roifile/>`_::
 
-    python -m pip install -U roifile tifffile matplotlib
+    python -m pip install -U roifile[all]
+
+View overlays stored in a ROI, ZIP, or TIFF file::
+
+    python -m roifile file.roi
+
+See `Examples`_ for using the programming interface.
+
+Source code, examples, and support are available on
+`GitHub <https://github.com/cgohlke/roifile>`_.
 
 Requirements
 ------------
 
-This release has been tested with the following requirements and dependencies
+This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
-- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2022.8.12 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.5.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython 3.8.10, 3.9.13, 3.10.10, 3.11.2 <https://www.python.org>`_
+- `Numpy 1.23.5 <https://pypi.org/project/numpy/>`_
+- `Tifffile 2023.2.3 <https://pypi.org/project/tifffile/>`_  (optional)
+- `Matplotlib 3.6.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+
+2023.2.12
+
+- Delay import of zipfile.
+- Verify shape of coordinates on write.
 
 2022.9.19
 
@@ -117,7 +131,11 @@ Notes
 -----
 
 The ImageJ ROI format cannot store integer coordinate values outside the
-range of -32768 to 32767 (16-bit signed).
+range of -5000..60536.
+
+Refer to the ImageJ `RoiDecoder.java
+<https://github.com/imagej/ImageJ/blob/master/ij/io/RoiDecoder.java>`_
+source code for a reference implementation.
 
 Other Python packages handling ImageJ ROIs:
 
@@ -163,13 +181,13 @@ Plot the ROI using matplotlib:
 
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
-    $ python -m roifile _test.roi
+    python -m roifile _test.roi
 
 """
 
 from __future__ import annotations
 
-__version__ = '2022.9.19'
+__version__ = '2023.2.12'
 
 __all__ = [
     'roiread',
@@ -186,7 +204,6 @@ import enum
 import os
 import struct
 import sys
-import zipfile
 import dataclasses
 
 from typing import Any, Iterable, Literal, Union
@@ -238,6 +255,8 @@ def roiwrite(
     if name is None:
         name = [r.name if r.name else r.autoname for r in roi]
     name = [n if n[-4:].lower() == '.roi' else n + '.roi' for n in name]
+
+    import zipfile
 
     with zipfile.ZipFile(filename, mode) as zf:
         for n, r in zip(name, roi):
@@ -469,6 +488,8 @@ class ImagejRoi:
                 ]
 
         if filename[-4:].lower() == '.zip':
+            import zipfile
+
             with zipfile.ZipFile(filename) as zf:
                 return [
                     cls.frombytes(
@@ -662,7 +683,7 @@ class ImagejRoi:
         self,
         filename: os.PathLike | str,
         name: str | None = None,
-        mode: ZipFileMode = None,
+        mode: ZipFileMode | None = None,
     ) -> None:
         """Write ImagejRoi to ROI or ZIP file.
 
@@ -677,6 +698,8 @@ class ImagejRoi:
                 name += '.roi'
             if mode is None:
                 mode = 'a' if os.path.exists(filename) else 'w'
+            import zipfile
+
             with zipfile.ZipFile(filename, mode) as zf:
                 with zf.open(name, 'w') as fh:
                     fh.write(self.tobytes())
@@ -773,9 +796,21 @@ class ImagejRoi:
             ROI_TYPE.POINT,
         ):
             if self.integer_coordinates is not None:
+                if self.integer_coordinates.shape != (self.n_coordinates, 2):
+                    raise ValueError(
+                        'integer_coordinates.shape '
+                        f'{self.integer_coordinates.shape} '
+                        f'!= ({self.n_coordinates}, 2)'
+                    )
                 coord = self.integer_coordinates.astype(self.byteorder + 'i2')
                 extradata = coord.tobytes(order='F')
             if self.subpixel_coordinates is not None:
+                if self.subpixel_coordinates.shape != (self.n_coordinates, 2):
+                    raise ValueError(
+                        'subpixel_coordinates.shape '
+                        f'{self.subpixel_coordinates.shape} '
+                        f'!= ({self.n_coordinates}, 2)'
+                    )
                 coord = self.subpixel_coordinates.astype(self.byteorder + 'f4')
                 extradata += coord.tobytes(order='F')
 
@@ -1066,7 +1101,7 @@ class ImagejRoi:
 
     @property
     def autoname(self) -> str:
-        """Return name generated from positions."""
+        """Name generated from positions."""
         y = (self.bottom - self.top) // 2
         x = (self.right - self.left) // 2
         name = f'{y:05}-{x:05}'
@@ -1077,7 +1112,7 @@ class ImagejRoi:
 
     @property
     def utf16(self) -> str:
-        """Return UTF-16 codec depending on byteorder."""
+        """UTF-16 codec depending on byteorder."""
         return 'utf-16' + ('be' if self.byteorder == '>' else 'le')
 
     def __eq__(self, other: object) -> bool:
@@ -1222,7 +1257,7 @@ def main(argv: list[str] | None = None) -> int:
 
     Show all ImageJ ROIs in file or all files in directory::
 
-        $ python -m roifile file_or_directory
+        python -m roifile file_or_directory
 
     """
     from glob import glob
