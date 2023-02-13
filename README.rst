@@ -9,30 +9,44 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2022.9.19
-:DOI: 10.5281/zenodo.6941603
+:Version: 2023.2.12
+:DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
-Installation
-------------
+Quickstart
+----------
 
-Install the roifile package and common dependencies from the
-Python Package Index::
+Install the roifile package and all dependencies from the
+`Python Package Index <https://pypi.org/project/roifile/>`_::
 
-    python -m pip install -U roifile tifffile matplotlib
+    python -m pip install -U roifile[all]
+
+View overlays stored in a ROI, ZIP, or TIFF file::
+
+    python -m roifile file.roi
+
+See `Examples`_ for using the programming interface.
+
+Source code, examples, and support are available on
+`GitHub <https://github.com/cgohlke/roifile>`_.
 
 Requirements
 ------------
 
-This release has been tested with the following requirements and dependencies
+This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
-- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2022.8.12 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.5.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython 3.8.10, 3.9.13, 3.10.10, 3.11.2 <https://www.python.org>`_
+- `Numpy 1.23.5 <https://pypi.org/project/numpy/>`_
+- `Tifffile 2023.2.3 <https://pypi.org/project/tifffile/>`_  (optional)
+- `Matplotlib 3.6.3 <https://pypi.org/project/matplotlib/>`_  (optional)
 
 Revisions
 ---------
+
+2023.2.12
+
+- Delay import of zipfile.
+- Verify shape of coordinates on write.
 
 2022.9.19
 
@@ -87,7 +101,11 @@ Notes
 -----
 
 The ImageJ ROI format cannot store integer coordinate values outside the
-range of -32768 to 32767 (16-bit signed).
+range of -5000..60536.
+
+Refer to the ImageJ `RoiDecoder.java
+<https://github.com/imagej/ImageJ/blob/master/ij/io/RoiDecoder.java>`_
+source code for a reference implementation.
 
 Other Python packages handling ImageJ ROIs:
 
@@ -133,4 +151,4 @@ Plot the ROI using matplotlib:
 
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
-    $ python -m roifile _test.roi
+    python -m roifile _test.roi
