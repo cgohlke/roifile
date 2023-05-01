@@ -65,8 +65,8 @@ setup(
     packages=['roifile'],
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
     python_requires='>=3.8',
-    install_requires=['numpy>=1.19.2'],
-    extras_require={'all': ['matplotlib>=3.3', 'tifffile>=2021.11.2']},
+    install_requires=['numpy'],
+    extras_require={'all': ['matplotlib', 'tifffile']},
     platforms=['any'],
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -75,7 +75,6 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
