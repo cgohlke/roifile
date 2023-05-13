@@ -9,7 +9,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2023.2.12
+:Version: 2023.5.12
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -35,13 +35,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.10, 3.11.2 <https://www.python.org>`_
-- `Numpy 1.23.5 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2023.2.3 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.6.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.3
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.23.5
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.4.12 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.7.1 (optional)
 
 Revisions
 ---------
+
+2023.5.12
+
+- Improve object repr and type hints.
+- Drop support for Python 3.8 and numpy < 1.21 (NEP29).
 
 2023.2.12
 
