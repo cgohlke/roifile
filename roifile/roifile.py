@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2023.2.12
+:Version: 2023.5.12
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.10, 3.11.2 <https://www.python.org>`_
-- `Numpy 1.23.5 <https://pypi.org/project/numpy/>`_
-- `Tifffile 2023.2.3 <https://pypi.org/project/tifffile/>`_  (optional)
-- `Matplotlib 3.6.3 <https://pypi.org/project/matplotlib/>`_  (optional)
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.3
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.23.5
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.4.12 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.7.1 (optional)
 
 Revisions
 ---------
+
+2023.5.12
+
+- Improve object repr and type hints.
+- Drop support for Python 3.8 and numpy < 1.21 (NEP29).
 
 2023.2.12
 
@@ -187,7 +192,7 @@ View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
 from __future__ import annotations
 
-__version__ = '2023.2.12'
+__version__ = '2023.5.12'
 
 __all__ = [
     'roiread',
@@ -198,6 +203,7 @@ __all__ = [
     'ROI_OPTIONS',
     'ROI_POINT_TYPE',
     'ROI_POINT_SIZE',
+    'ROI_COLOR_NONE',
 ]
 
 import enum
@@ -206,20 +212,20 @@ import struct
 import sys
 import dataclasses
 
-from typing import Any, Iterable, Literal, Union
 import numpy
 
-try:
-    from numpy.typing import ArrayLike
-except ImportError:
-    # numpy < 1.20
-    from numpy import ndarray as ArrayLike
+from typing import TYPE_CHECKING
 
-ZipFileMode = Union[Literal['r'], Literal['w'], Literal['x'], Literal['a']]
+if TYPE_CHECKING:
+    from typing import Any, Literal, Union
+    from collections.abc import Iterable
+    from numpy.typing import ArrayLike, NDArray
+
+    ZipFileMode = Union[Literal['r'], Literal['w'], Literal['x'], Literal['a']]
 
 
 def roiread(
-    filename: os.PathLike | str, /, *, min_int_coord: int | None = None
+    filename: os.PathLike[Any] | str, /, *, min_int_coord: int | None = None
 ) -> ImagejRoi | list[ImagejRoi]:
     """Return ImagejRoi instance(s) from ROI, ZIP, or TIFF file.
 
@@ -230,7 +236,7 @@ def roiread(
 
 
 def roiwrite(
-    filename: os.PathLike | str,
+    filename: os.PathLike[Any] | str,
     roi: ImagejRoi | Iterable[ImagejRoi],
     /,
     *,
@@ -265,6 +271,8 @@ def roiwrite(
 
 
 class ROI_TYPE(enum.IntEnum):
+    """ImageJ ROI types."""
+
     POLYGON = 0
     RECT = 1
     OVAL = 2
@@ -279,6 +287,8 @@ class ROI_TYPE(enum.IntEnum):
 
 
 class ROI_SUBTYPE(enum.IntEnum):
+    """ImageJ ROI subtypes."""
+
     UNDEFINED = 0
     TEXT = 1
     ARROW = 2
@@ -288,6 +298,8 @@ class ROI_SUBTYPE(enum.IntEnum):
 
 
 class ROI_OPTIONS(enum.IntFlag):
+    """ImageJ ROI options."""
+
     SPLINE_FIT = 1
     DOUBLE_HEADED = 2
     OUTLINE = 4
@@ -304,6 +316,8 @@ class ROI_OPTIONS(enum.IntFlag):
 
 
 class ROI_POINT_TYPE(enum.IntEnum):
+    """ImageJ ROI point types."""
+
     HYBRID = 0
     CROSS = 1
     # CROSSHAIR = 1
@@ -312,6 +326,8 @@ class ROI_POINT_TYPE(enum.IntEnum):
 
 
 class ROI_POINT_SIZE(enum.IntEnum):
+    """ImageJ ROI point sizes."""
+
     TINY = 1
     SMALL = 3
     MEDIUM = 5
@@ -322,6 +338,7 @@ class ROI_POINT_SIZE(enum.IntEnum):
 
 
 ROI_COLOR_NONE = b'\x00\x00\x00\x00'
+"""No color or Black."""
 
 
 @dataclasses.dataclass
@@ -365,16 +382,16 @@ class ImagejRoi:
     image_opacity: int = 0
     image_size: int = 0
     float_stroke_width: float = 0.0
-    integer_coordinates: numpy.ndarray | None = None
-    subpixel_coordinates: numpy.ndarray | None = None
-    multi_coordinates: numpy.ndarray | None = None
-    counters: numpy.ndarray | None = None
-    counter_positions: numpy.ndarray | None = None  # flat indices to TZC array
     text_size: int = 0
     text_style: int = 0
     text_justification: int = 0
     text_name: str = ''
     text: str = ''
+    counters: NDArray[numpy.uint8] | None = None
+    counter_positions: NDArray[numpy.uint32] | None = None
+    integer_coordinates: NDArray[numpy.int32] | None = None
+    subpixel_coordinates: NDArray[numpy.float32] | None = None
+    multi_coordinates: NDArray[numpy.float32] | None = None
 
     @classmethod
     def frompoints(
@@ -452,7 +469,7 @@ class ImagejRoi:
     @classmethod
     def fromfile(
         cls,
-        filename: os.PathLike | str,
+        filename: os.PathLike[Any] | str,
         /,
         *,
         min_int_coord: int | None = None,
@@ -612,14 +629,14 @@ class ImagejRoi:
                 self.props = props.decode(self.utf16)
 
             if counters_offset > 0:
-                counters: numpy.ndarray = numpy.ndarray(
+                counters: NDArray[numpy.uint32] = numpy.ndarray(
                     shape=self.n_coordinates,
                     dtype=self.byteorder + 'u4',
                     buffer=data,
                     offset=counters_offset,
                 )
                 self.counters = (counters & 0xFF).astype('u1')
-                self.counter_positions = counters >> 8
+                self.counter_positions = (counters >> 8).astype('u4')
 
         if self.version >= 218 and self.subtype == ROI_SUBTYPE.TEXT:
             (
@@ -681,7 +698,7 @@ class ImagejRoi:
 
     def tofile(
         self,
-        filename: os.PathLike | str,
+        filename: os.PathLike[Any] | str,
         name: str | None = None,
         mode: ZipFileMode | None = None,
     ) -> None:
@@ -870,7 +887,7 @@ class ImagejRoi:
 
         return b''.join(result)
 
-    def plot(
+    def plot(  # type: ignore
         self,
         ax: Any | None = None,
         *,
@@ -982,8 +999,9 @@ class ImagejRoi:
 
     def coordinates(
         self, multi: bool = False
-    ) -> numpy.ndarray | list[numpy.ndarray]:
+    ) -> NDArray[Any] | list[NDArray[Any]]:
         """Return x, y coordinates as numpy array for display."""
+        coords: Any
         if self.subpixel_coordinates is not None:
             coords = self.subpixel_coordinates.copy()
         elif self.integer_coordinates is not None:
@@ -1023,10 +1041,13 @@ class ImagejRoi:
         return f'#{b[3]:02x}{b[2]:02x}{b[1]:02x}'
 
     @staticmethod
-    def path2coords(path: numpy.ndarray, /) -> list[numpy.ndarray]:
+    def path2coords(
+        multi_coordinates: NDArray[numpy.float32], /
+    ) -> list[NDArray[numpy.float32]]:
         """Return list of coordinate arrays from 2D geometric path."""
         coordinates = []
-        points: list[list[int | float]] = []
+        points: list[list[float]] = []
+        path: list[float] = multi_coordinates.tolist()
         n = 0
         m = 0
         while n < len(path):
@@ -1034,7 +1055,7 @@ class ImagejRoi:
             if op == 0:
                 # MOVETO
                 if n > 0:
-                    coordinates.append(numpy.array(points))
+                    coordinates.append(numpy.array(points, dtype='f4'))
                     points = []
                 points.append([path[n + 1], path[n + 2]])
                 m = len(points) - 1
@@ -1055,7 +1076,7 @@ class ImagejRoi:
             else:
                 raise RuntimeError(f'invalid PathIterator command {op!r}')
 
-        coordinates.append(numpy.array(points))
+        coordinates.append(numpy.array(points, dtype='f4'))
         return coordinates
 
     @staticmethod
@@ -1127,16 +1148,22 @@ class ImagejRoi:
         )
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__} {self.name!r}>'
+        info = [f'{self.__class__.__name__}(']
+        for name, value in self.__dict__.items():
+            if isinstance(value, numpy.ndarray):
+                value = repr(value).replace('    ', ' ')
+                value = value.replace('([[', '([\n    [')
+                info.append(f'{name}=numpy.{value},')
+            elif value == getattr(ImagejRoi, name):
+                pass
+            elif isinstance(value, enum.Enum):
+                info.append(f'{name}={enumstr(value)},')
+            else:
+                info.append(f'{name}={value!r},')
+        return indent(*info, end='\n)')
 
-    def __str__(self) -> str:
-        return indent(
-            repr(self),
-            *(f'{name} = {value!r}' for name, value in self.__dict__.items()),
-        )
 
-
-def oval(rect: ArrayLike, /, points: int = 33) -> numpy.ndarray:
+def oval(rect: ArrayLike, /, points: int = 33) -> NDArray[numpy.float32]:
     """Return coordinates of oval from rectangle corners."""
     arr = numpy.array(rect, dtype=numpy.float32)
     c = numpy.linspace(0.0, 2.0 * numpy.pi, num=points, dtype=numpy.float32)
@@ -1148,15 +1175,40 @@ def oval(rect: ArrayLike, /, points: int = 33) -> numpy.ndarray:
     return c
 
 
-def indent(*args) -> str:
-    """Return joined string representations of objects with lines indented."""
-    text = '\n'.join(str(arg) for arg in args)
-    return '\n'.join(
-        ('  ' + line if line else line) for line in text.splitlines() if line
-    )[2:]
+def indent(*args: Any, sep='', end='') -> str:
+    """Return joined string representations of objects with indented lines."""
+    text = (sep + '\n').join(
+        arg if isinstance(arg, str) else repr(arg) for arg in args
+    )
+    return (
+        '\n'.join(
+            ('    ' + line if line else line)
+            for line in text.splitlines()
+            if line
+        )[4:]
+        + end
+    )
 
 
-def log_warning(msg: object, *args: object, **kwargs) -> None:
+def enumstr(v: enum.Enum | None, /) -> str:
+    """Return IntEnum or IntFlag as str."""
+    # repr() and str() of enums are type, value, and version dependent
+    if v is None:
+        return 'None'
+    # return f'{v.__class__.__name__}({v.value})'
+    s = repr(v)
+    s = s[1:].split(':', 1)[0]
+    if 'UNKNOWN' in s:
+        s = f'{v.__class__.__name__}({v.value})'
+    elif '|' in s:
+        # IntFlag combination
+        s = s.replace('|', ' | ' + v.__class__.__name__ + '.')
+    elif not hasattr(v, 'name') or v.name is None:
+        s = f'{v.__class__.__name__}({v.value})'
+    return s
+
+
+def log_warning(msg: object, *args: object, **kwargs: Any) -> None:
     """Log message with level WARNING."""
     import logging
 
