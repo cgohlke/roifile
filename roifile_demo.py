@@ -11,7 +11,6 @@ import numpy
 from matplotlib import pyplot
 from skimage.measure import find_contours, label, regionprops
 from tifffile import TiffFile, imwrite
-
 from roifile import ImagejRoi
 
 
