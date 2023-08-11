@@ -2,6 +2,8 @@ include LICENSE
 include README.rst
 include roifile_demo.py
 
+include roifile/py.typed
+
 exclude *.cmd
 recursive-exclude doc *
 recursive-exclude docs *
