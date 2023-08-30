@@ -11,6 +11,7 @@ import numpy
 from matplotlib import pyplot
 from skimage.measure import find_contours, label, regionprops
 from tifffile import TiffFile, imwrite
+
 from roifile import ImagejRoi
 
 
@@ -31,6 +32,7 @@ def plot_image_overlays(image, overlays, **kwargs):
 # blob/b6a74daa8c2adf7023d20a447d9a2799614c857a/box.tif
 with TiffFile('tests/box.tif') as tif:
     image = tif.pages[0].asarray()
+    assert tif.imagej_metadata is not None
     overlays = tif.imagej_metadata['Overlays']
 
 plot_image_overlays(image, overlays)
