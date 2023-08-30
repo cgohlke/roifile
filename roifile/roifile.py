@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2023.5.12
+:Version: 2023.8.30
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.3
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.23.5
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.4.12 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.7.1 (optional)
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.5, 3.12rc
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.25.2
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.8.30 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.7.2 (optional)
 
 Revisions
 ---------
+
+2023.8.30
+
+- Fix linting issues.
+- Add py.typed marker.
 
 2023.5.12
 
@@ -192,7 +197,7 @@ View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
 from __future__ import annotations
 
-__version__ = '2023.5.12'
+__version__ = '2023.8.30'
 
 __all__ = [
     'roiread',
@@ -206,19 +211,19 @@ __all__ = [
     'ROI_COLOR_NONE',
 ]
 
+import dataclasses
 import enum
 import os
 import struct
 import sys
-import dataclasses
+from typing import TYPE_CHECKING
 
 import numpy
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Literal, Union
     from collections.abc import Iterable
+    from typing import Any, Literal, Union
+
     from numpy.typing import ArrayLike, NDArray
 
     ZipFileMode = Union[Literal['r'], Literal['w'], Literal['x'], Literal['a']]
@@ -268,6 +273,7 @@ def roiwrite(
         for n, r in zip(name, roi):
             with zf.open(n, 'w') as fh:
                 fh.write(r.tobytes())
+    return None
 
 
 class ROI_TYPE(enum.IntEnum):
@@ -484,7 +490,7 @@ class ImagejRoi:
             import tifffile
 
             with tifffile.TiffFile(filename) as tif:
-                if not tif.is_imagej:
+                if tif.imagej_metadata is None:
                     raise ValueError('file does not contain ImagejRoi')
                 rois = []
                 if 'Overlays' in tif.imagej_metadata:
@@ -584,10 +590,7 @@ class ImagejRoi:
         elif (
             self.roitype == ROI_TYPE.LINE
             or self.roitype == ROI_TYPE.FREEHAND
-            and (
-                self.subtype == ROI_SUBTYPE.ELLIPSE
-                or self.subtype == ROI_SUBTYPE.ROTATED_RECT
-            )
+            and self.subtype in {ROI_SUBTYPE.ELLIPSE, ROI_SUBTYPE.ROTATED_RECT}
         ):
             (self.x1, self.y1, self.x2, self.y2) = struct.unpack(
                 self.byteorder + 'ffff', data[18:34]
@@ -733,10 +736,10 @@ class ImagejRoi:
                 self.byteorder + 'hBxhhhhH',
                 self.version,
                 self.roitype.value,
-                numpy.array(self.top, 'i2'),
-                numpy.array(self.left, 'i2'),
-                numpy.array(self.bottom, 'i2'),
-                numpy.array(self.right, 'i2'),
+                numpy.array(self.top).astype('i2'),
+                numpy.array(self.left).astype('i2'),
+                numpy.array(self.bottom).astype('i2'),
+                numpy.array(self.right).astype('i2'),
                 self.n_coordinates if self.n_coordinates < 2**16 else 0,
             )
         )
@@ -754,10 +757,7 @@ class ImagejRoi:
         elif (
             self.roitype == ROI_TYPE.LINE
             or self.roitype == ROI_TYPE.FREEHAND
-            and (
-                self.subtype == ROI_SUBTYPE.ELLIPSE
-                or self.subtype == ROI_SUBTYPE.ROTATED_RECT
-            )
+            and self.subtype in {ROI_SUBTYPE.ELLIPSE, ROI_SUBTYPE.ROTATED_RECT}
         ):
             result.append(
                 struct.pack(
@@ -947,7 +947,7 @@ class ImagejRoi:
             # TODO: use data units
             if self.float_stroke_width > 0.0:
                 kwargs['linewidth'] = self.float_stroke_width
-            elif self.stroke_width > 0.0:
+            elif self.stroke_width > 0:
                 kwargs['linewidth'] = self.stroke_width
         if roitype == ROI_TYPE.POINT:
             if 'marker' not in kwargs:
@@ -1091,8 +1091,7 @@ class ImagejRoi:
             return -5000
         if -32768 <= value <= 0:
             return int(value)
-        else:
-            raise ValueError('min_int_coord out of range')
+        raise ValueError('min_int_coord out of range')
 
     @property
     def composite(self) -> bool:
@@ -1115,9 +1114,7 @@ class ImagejRoi:
         return (
             self.version >= 223
             and self.subpixelresolution
-            and (
-                self.roitype == ROI_TYPE.RECT or self.roitype == ROI_TYPE.OVAL
-            )
+            and self.roitype in (ROI_TYPE.RECT, ROI_TYPE.OVAL)
         )
 
     @property
@@ -1226,7 +1223,7 @@ def test(verbose: bool = False) -> None:
         roi.coordinates()
         if verbose:
             print(roi)
-        roi.__str__()
+        str(roi)
 
     # re-write ROIs to a ZIP file
     try:
@@ -1253,7 +1250,7 @@ def test(verbose: bool = False) -> None:
     assert coords[-1][-1][-1] == 587.0
     assert roi.multi_coordinates is not None
     assert roi.multi_coordinates[0] == 0.0
-    roi.__str__()
+    str(roi)
 
     roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
@@ -1299,7 +1296,7 @@ def test(verbose: bool = False) -> None:
         roi.coordinates()
         if verbose:
             print(roi)
-        roi.__str__()
+        str(roi)
 
     assert ImagejRoi() == ImagejRoi()
 
