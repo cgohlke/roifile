@@ -1,5 +1,6 @@
 include LICENSE
 include README.rst
+include CHANGES.rst
 include roifile_demo.py
 
 include roifile/py.typed
