@@ -9,7 +9,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2023.8.30
+:Version: 2024.1.10
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -35,13 +35,20 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.5, 3.12rc
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.25.2
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.8.30 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.7.2 (optional)
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.4, 3.12.1
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.3
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.12.9 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.2 (optional)
 
 Revisions
 ---------
+
+2024.1.10
+
+- Support text rotation.
+- Improve text rendering.
+- Avoid array copies.
+- Limit size read from files.
 
 2023.8.30
 
@@ -80,32 +87,9 @@ Revisions
 
 2021.6.6
 
-- Add enums for point types and sizes.
+- …
 
-2020.11.28
-
-- Support group attribute.
-- Add roiread and roiwrite functions (#3).
-- Use UUID as default name of ROI in ImagejRoi.frompoints (#2).
-
-2020.8.13
-
-- Support writing to ZIP file.
-- Support os.PathLike file names.
-
-2020.5.28
-
-- Fix int32 to hex color conversion.
-- Fix coordinates of closing path.
-- Fix reading TIFF files with no overlays.
-
-2020.5.1
-
-- Split positions from counters.
-
-2020.2.12
-
-- Initial release.
+Refer to the CHANGES file for older revisions.
 
 Notes
 -----
