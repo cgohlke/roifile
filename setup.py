@@ -17,7 +17,7 @@ def search(pattern, code, flags=0):
 
 
 with open('roifile/roifile.py', encoding='utf-8') as fh:
-    code = fh.read()
+    code = fh.read().replace('\r\n', '\n').replace('\r', '\n')
 
 version = search(r"__version__ = '(.*?)'", code).replace('.x.x', '.dev0')
 
@@ -28,25 +28,40 @@ readme = search(
     code,
     re.MULTILINE | re.DOTALL,
 )
-
 readme = '\n'.join(
     [description, '=' * len(description)] + readme.splitlines()[1:]
 )
 
-license = search(
-    r'(# Copyright.*?(?:\r\n|\r|\n))(?:\r\n|\r|\n)+""',
-    code,
-    re.MULTILINE | re.DOTALL,
-)
-
-license = license.replace('# ', '').replace('#', '')
-
 if 'sdist' in sys.argv:
+    # update README, LICENSE, and CHANGES files
+
+    with open('README.rst', 'w', encoding='utf-8') as fh:
+        fh.write(readme)
+
+    license = search(
+        r'(# Copyright.*?(?:\r\n|\r|\n))(?:\r\n|\r|\n)+""',
+        code,
+        re.MULTILINE | re.DOTALL,
+    )
+    license = license.replace('# ', '').replace('#', '')
+
     with open('LICENSE', 'w', encoding='utf-8') as fh:
         fh.write('BSD 3-Clause License\n\n')
         fh.write(license)
-    with open('README.rst', 'w', encoding='utf-8') as fh:
-        fh.write(readme)
+
+    revisions = search(
+        r'(?:\r\n|\r|\n){2}(Revisions.*)- …',
+        readme,
+        re.MULTILINE | re.DOTALL,
+    ).strip()
+
+    with open('CHANGES.rst', encoding='utf-8') as fh:
+        old = fh.read()
+
+    old = old.split(revisions.splitlines()[-1])[-1]
+    with open('CHANGES.rst', 'w', encoding='utf-8') as fh:
+        fh.write(revisions.strip())
+        fh.write(old)
 
 setup(
     name='roifile',
