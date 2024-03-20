@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2024.1.10
+:Version: 2024.3.20
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -48,7 +48,7 @@ Quickstart
 Install the roifile package and all dependencies from the
 `Python Package Index <https://pypi.org/project/roifile/>`_::
 
-    python -m pip install -U roifile[all]
+    python -m pip install -U "roifile[all]"
 
 View overlays stored in a ROI, ZIP, or TIFF file::
 
@@ -65,13 +65,17 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.4, 3.12.1
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.3
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2023.12.9 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.2 (optional)
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.8, 3.12.2
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.4
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.2.12 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.3 (optional)
 
 Revisions
 ---------
+
+2024.3.20
+
+- Fix writing generator of ROIs (#9).
 
 2024.1.10
 
@@ -101,21 +105,6 @@ Revisions
 - Add subpixel_coordinates in frompoints for out-of-range integer coordinates.
 
 2022.7.29
-
-- Update metadata.
-
-2022.3.18
-
-- Fix creating ROIs from float coordinates exceeding int16 range (#7).
-- Fix bottom-right bounds in ImagejRoi.frompoints.
-
-2022.2.2
-
-- Add type hints.
-- Change ImagejRoi to dataclass.
-- Drop support for Python 3.7 and numpy < 1.19 (NEP29).
-
-2021.6.6
 
 - …
 
@@ -181,7 +170,7 @@ View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
 from __future__ import annotations
 
-__version__ = '2024.1.10'
+__version__ = '2024.3.20'
 
 __all__ = [
     'roiread',
@@ -253,14 +242,20 @@ def roiwrite(
     if mode is None:
         mode = 'a' if os.path.exists(filename) else 'w'
 
-    if name is None:
-        name = [r.name if r.name else r.autoname for r in roi]
-    name = [n if n[-4:].lower() == '.roi' else n + '.roi' for n in name]
+    if name is not None:
+        if isinstance(name, str):
+            raise ValueError("'name' is not an iterable of str")
+        name = iter(name)
 
     import zipfile
 
     with zipfile.ZipFile(filename, mode) as zf:
-        for n, r in zip(name, roi):
+        for r in roi:
+            if name is None:
+                n = r.name if r.name else r.autoname
+            else:
+                n = next(name)
+            n = n if n[-4:].lower() == '.roi' else n + '.roi'
             with zf.open(n, 'w') as fh:
                 fh.write(r.tobytes())
     return None
@@ -1272,7 +1267,12 @@ def test(verbose: bool = False) -> None:
         os.remove('_test.zip')
     except OSError:
         pass
-    roiwrite('_test.zip', rois)
+
+    def roi_iter():
+        # issue #9
+        yield from rois
+
+    roiwrite('_test.zip', roi_iter())
     assert roiread('_test.zip') == rois
 
     # verify box_combined
