@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2024.3.20
+
+- Fix writing generator of ROIs (#9).
+
 2024.1.10
 
 - Support text rotation.
