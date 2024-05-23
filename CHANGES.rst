@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2024.5.24
+
+- Fix GitHub not correctly rendering docstring examples.
+
 2024.3.20
 
 - Fix writing generator of ROIs (#9).
