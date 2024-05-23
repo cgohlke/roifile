@@ -9,10 +9,9 @@ segmentation from/to ImageJ TIFF files.
 
 import numpy
 from matplotlib import pyplot
+from roifile import ImagejRoi
 from skimage.measure import find_contours, label, regionprops
 from tifffile import TiffFile, imwrite
-
-from roifile import ImagejRoi
 
 
 def plot_image_overlays(image, overlays, **kwargs):
