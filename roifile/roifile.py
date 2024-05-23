@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2024.3.20
+:Version: 2024.5.24
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,17 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.8, 3.12.2
+- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.9, 3.12.3
 - `Numpy <https://pypi.org/project/numpy/>`_ 1.26.4
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.2.12 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.3 (optional)
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.5.22 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.4 (optional)
 
 Revisions
 ---------
+
+2024.5.24
+
+- Fix GitHub not correctly rendering docstring examples.
 
 2024.3.20
 
@@ -170,7 +174,7 @@ View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
 from __future__ import annotations
 
-__version__ = '2024.3.20'
+__version__ = '2024.5.24'
 
 __all__ = [
     'roiread',
