@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2024.5.24
+:Version: 2024.9.15
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,17 +65,22 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.9, 3.12.3
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.4
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.5.22 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.4 (optional)
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.5, 3.13.0rc2
+- `Numpy <https://pypi.org/project/numpy/>`_ 2.2.1
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.8.30 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.9.2 (optional)
 
 Revisions
 ---------
 
+2024.9.15
+
+- Improve typing.
+- Deprecate Python 3.9, support Python 3.13.
+
 2024.5.24
 
-- Fix GitHub not correctly rendering docstring examples.
+- Fix docstring examples not correctly rendered on GitHub.
 
 2024.3.20
 
@@ -161,20 +166,47 @@ array([[1.1, 2.2],
        [5.5, 6.6]], dtype=float32)
 >>> roi.left, roi.top, roi.right, roi.bottom
 (1, 2, 7, 8)
+>>> roi2.name = 'test'
 
 Plot the ROI using matplotlib:
 
 >>> roi.plot()
 
+Write the ROIs to a ZIP file:
+
+>>> roiwrite('_test.zip', [roi, roi2], mode='w')
+
+Read the ROIs from the ZIP file:
+
+>>> rois = roiread('_test.zip')
+>>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
+
+Write the ROIs to an ImageJ formatted TIFF file:
+
+>>> import tifffile
+>>> tifffile.imwrite(
+...     '_test.tif',
+...     numpy.zeros((9, 9), 'u1'),
+...     imagej=True,
+...     metadata={'Overlays': [roi.tobytes(), roi2.tobytes()]},
+... )
+
+Read the ROIs embedded in an ImageJ formatted TIFF file:
+
+>>> rois = roiread('_test.tif')
+>>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
+
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
     python -m roifile _test.roi
+
+For an advanced example, see `roifile_demo.py` in the source distribution.
 
 """
 
 from __future__ import annotations
 
-__version__ = '2024.5.24'
+__version__ = '2024.9.15'
 
 __all__ = [
     'roiread',
@@ -201,8 +233,9 @@ import numpy
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import Any, Literal
+    from typing import Any, Iterator, Literal
 
+    from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -892,15 +925,16 @@ class ImagejRoi:
 
     def plot(
         self,
-        ax: Any | None = None,
+        ax: Axes | None = None,
         *,
         rois: Iterable[ImagejRoi] | None = None,
         title: str | None = None,
         bounds: bool = False,
         invert_yaxis: bool | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Plot a draft of coordinates using matplotlib."""
+        fig: Any
         roitype = self.roitype
         subtype = self.subtype
 
@@ -942,8 +976,6 @@ class ImagejRoi:
             pyplot.show()
             return
 
-        if kwargs is None:
-            kwargs = {}
         if 'color' not in kwargs and 'c' not in kwargs:
             kwargs['color'] = self.hexcolor(self.stroke_color)
         if 'linewidth' not in kwargs and 'lw' not in kwargs:
@@ -974,7 +1006,8 @@ class ImagejRoi:
             if 'fontsize' not in kwargs and self.text_size > 0:
                 kwargs['fontsize'] = self.text_size
             text = ax.text(
-                *coords[1],
+                coords[1][0],
+                coords[1][1],
                 self.text,
                 va='center_baseline',
                 rotation=self.text_angle,
@@ -1180,17 +1213,37 @@ class ImagejRoi:
         return indent(*info, end='\n)')
 
 
-def scale_text(text: Any, width: float) -> None:
+def scale_text(
+    text: Any,
+    width: float,
+    *,
+    offset: tuple[float, float] | None = None,
+) -> None:
     """Scale matplotlib text to width in data coordinates."""
     from matplotlib.patheffects import AbstractPathEffect
     from matplotlib.transforms import Bbox
 
     class TextScaler(AbstractPathEffect):
-        def __init__(self, text, width):
+        def __init__(
+            self,
+            text: Any,
+            width: float,
+            offset: tuple[float, float] | None = None,
+        ) -> None:
+            if offset is None:
+                offset = (0.0, 0.0)
+            super().__init__(offset)
             self._text = text
             self._width = width
 
-        def draw_path(self, renderer, gc, tpath, affine, rgbFace=None):
+        def draw_path(
+            self,
+            renderer: Any,
+            gc: Any,
+            tpath: Any,
+            affine: Any,
+            rgbFace: Any = None,
+        ) -> None:
             ax = self._text.axes
             renderer = ax.get_figure().canvas.get_renderer()
             bbox = text.get_window_extent(renderer=renderer)
@@ -1200,7 +1253,7 @@ def scale_text(text: Any, width: float) -> None:
                 affine = affine.from_values(scale, 0, 0, scale, 0, 0) + affine
             renderer.draw_path(gc, tpath, affine, rgbFace)
 
-    text.set_path_effects([TextScaler(text, width)])
+    text.set_path_effects([TextScaler(text, width, offset)])
 
 
 def oval(rect: ArrayLike, /, points: int = 33) -> NDArray[numpy.float32]:
@@ -1215,9 +1268,9 @@ def oval(rect: ArrayLike, /, points: int = 33) -> NDArray[numpy.float32]:
     return c
 
 
-def indent(*args: Any, sep='', end='') -> str:
+def indent(*args: Any, sep: str = '', end: str = '') -> str:
     """Return joined string representations of objects with indented lines."""
-    text = (sep + '\n').join(
+    text: str = (sep + '\n').join(
         arg if isinstance(arg, str) else repr(arg) for arg in args
     )
     return (
@@ -1256,7 +1309,7 @@ def logger() -> logging.Logger:
 def test(verbose: bool = False) -> None:
     """Test roifile.ImagejRoi class."""
     # test ROIs from a ZIP file
-    rois = ImagejRoi.fromfile('tests/ijzip.zip')
+    rois: Any = ImagejRoi.fromfile('tests/ijzip.zip')
     assert isinstance(rois, list)
     assert len(rois) == 7
     for roi in rois:
@@ -1272,7 +1325,7 @@ def test(verbose: bool = False) -> None:
     except OSError:
         pass
 
-    def roi_iter():
+    def roi_iter() -> Iterator[ImagejRoi]:
         # issue #9
         yield from rois
 
