@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2024.5.24
+:Version: 2024.9.15
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -38,17 +38,22 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.9.13, 3.10.11, 3.11.9, 3.12.3
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.4
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.5.22 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.8.4 (optional)
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.5, 3.13.0rc2
+- `Numpy <https://pypi.org/project/numpy/>`_ 2.2.1
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.8.30 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.9.2 (optional)
 
 Revisions
 ---------
 
+2024.9.15
+
+- Improve typing.
+- Deprecate Python 3.9, support Python 3.13.
+
 2024.5.24
 
-- Fix GitHub not correctly rendering docstring examples.
+- Fix docstring examples not correctly rendered on GitHub.
 
 2024.3.20
 
@@ -140,6 +145,7 @@ Read the ImageJ ROI from the file and verify the content:
            [5.5, 6.6]], dtype=float32)
     >>> roi.left, roi.top, roi.right, roi.bottom
     (1, 2, 7, 8)
+    >>> roi2.name = 'test'
 
 Plot the ROI using matplotlib:
 
@@ -147,6 +153,40 @@ Plot the ROI using matplotlib:
 
     >>> roi.plot()
 
+Write the ROIs to a ZIP file:
+
+.. code-block:: python
+
+    >>> roiwrite('_test.zip', [roi, roi2], mode='w')
+
+Read the ROIs from the ZIP file:
+
+.. code-block:: python
+
+    >>> rois = roiread('_test.zip')
+    >>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
+
+Write the ROIs to an ImageJ formatted TIFF file:
+
+.. code-block:: python
+
+    >>> import tifffile
+    >>> tifffile.imwrite(
+    ...     '_test.tif',
+    ...     numpy.zeros((9, 9), 'u1'),
+    ...     imagej=True,
+    ...     metadata={'Overlays': [roi.tobytes(), roi2.tobytes()]},
+    ... )
+
+Read the ROIs embedded in an ImageJ formatted TIFF file:
+
+.. code-block:: python
+
+    >>> rois = roiread('_test.tif')
+    >>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
+
 View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
 
     python -m roifile _test.roi
+
+For an advanced example, see `roifile_demo.py` in the source distribution.
