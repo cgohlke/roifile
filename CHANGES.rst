@@ -1,9 +1,14 @@
 Revisions
 ---------
 
+2024.9.15
+
+- Improve typing.
+- Deprecate Python 3.9, support Python 3.13.
+
 2024.5.24
 
-- Fix GitHub not correctly rendering docstring examples.
+- Fix docstring examples not correctly rendered on GitHub.
 
 2024.3.20
 
