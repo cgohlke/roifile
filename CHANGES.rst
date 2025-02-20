@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2025.2.20
+
+- Drop support for Python 3.9.
+
 2024.9.15
 
 - Improve typing.
