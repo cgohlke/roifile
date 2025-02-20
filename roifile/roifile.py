@@ -1,6 +1,6 @@
 # roifile.py
 
-# Copyright (c) 2020-2024, Christoph Gohlke
+# Copyright (c) 2020-2025, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2024.9.15
+:Version: 2025.2.20
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,17 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.5, 3.13.0rc2
-- `Numpy <https://pypi.org/project/numpy/>`_ 2.2.1
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2024.8.30 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.9.2 (optional)
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.9, 3.13.2 64-bit
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.3
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.2.18 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.0 (optional)
 
 Revisions
 ---------
+
+2025.2.20
+
+- Drop support for Python 3.9.
 
 2024.9.15
 
@@ -206,9 +210,10 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2024.9.15'
+__version__ = '2025.2.20'
 
 __all__ = [
+    '__version__',
     'roiread',
     'roiwrite',
     'ImagejRoi',
@@ -232,8 +237,8 @@ from typing import TYPE_CHECKING
 import numpy
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-    from typing import Any, Iterator, Literal
+    from collections.abc import Iterable, Iterator
+    from typing import Any, Literal
 
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
@@ -286,6 +291,7 @@ def roiwrite(
 
     import zipfile
 
+    assert mode is not None
     with zipfile.ZipFile(filename, mode) as zf:
         for r in roi:
             if name is None:
@@ -750,6 +756,7 @@ class ImagejRoi:
                 mode = 'a' if os.path.exists(filename) else 'w'
             import zipfile
 
+            assert mode is not None
             with zipfile.ZipFile(filename, mode) as zf:
                 with zf.open(name, 'w') as fh:
                     fh.write(self.tobytes())
@@ -1096,9 +1103,11 @@ class ImagejRoi:
         multi_coordinates: NDArray[numpy.float32], /
     ) -> list[NDArray[numpy.float32]]:
         """Return list of coordinate arrays from 2D geometric path."""
-        coordinates = []
+        coordinates: list[NDArray[numpy.float32]] = []
         points: list[list[float]] = []
-        path: list[float] = multi_coordinates.tolist()
+        path: list[float] = []
+
+        path = multi_coordinates.tolist()  # type: ignore[assignment]
         n = 0
         m = 0
         while n < len(path):
