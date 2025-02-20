@@ -8,7 +8,7 @@ import sys
 from setuptools import setup
 
 
-def search(pattern, string, flags=0):
+def search(pattern: str, string: str, flags: int = 0) -> str:
     """Return first match of pattern in string."""
     match = re.search(pattern, string, flags)
     if match is None:
@@ -16,7 +16,7 @@ def search(pattern, string, flags=0):
     return match.groups()[0]
 
 
-def fix_docstring_examples(docstring):
+def fix_docstring_examples(docstring: str) -> str:
     """Return docstring with examples fixed for GitHub."""
     start = True
     indent = False
@@ -99,7 +99,7 @@ setup(
     packages=['roifile'],
     package_data={'roifile': ['py.typed']},
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
-    python_requires='>=3.9',
+    python_requires='>=3.10',
     install_requires=['numpy'],
     extras_require={'all': ['matplotlib', 'tifffile']},
     platforms=['any'],
