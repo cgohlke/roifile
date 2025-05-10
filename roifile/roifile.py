@@ -38,8 +38,8 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 .. _ImageJ: https://imagej.net
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
-:License: BSD 3-Clause
-:Version: 2025.2.20
+:License: BSD-3-Clause
+:Version: 2025.5.10
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,17 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.9, 3.13.2 64-bit
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.3
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.2.18 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.0 (optional)
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.10, 3.13.3 64-bit
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.5
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.5.10 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.3 (optional)
 
 Revisions
 ---------
+
+2025.5.10
+
+- Support Python 3.14.
 
 2025.2.20
 
@@ -187,6 +191,7 @@ Read the ROIs from the ZIP file:
 
 Write the ROIs to an ImageJ formatted TIFF file:
 
+>>> import numpy
 >>> import tifffile
 >>> tifffile.imwrite(
 ...     '_test.tif',
@@ -210,7 +215,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2025.2.20'
+__version__ = '2025.5.10'
 
 __all__ = [
     '__version__',
@@ -1311,8 +1316,8 @@ def enumstr(v: enum.Enum | None, /) -> str:
 
 
 def logger() -> logging.Logger:
-    """Return logging.getLogger('roifile')."""
-    return logging.getLogger(__name__.replace('roifile.roifile', 'roifile'))
+    """Return logger for roifile module."""
+    return logging.getLogger('roifile')
 
 
 def test(verbose: bool = False) -> None:
