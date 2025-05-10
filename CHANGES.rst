@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2025.5.10
+
+- Support Python 3.14.
+
 2025.2.20
 
 - Drop support for Python 3.9.
