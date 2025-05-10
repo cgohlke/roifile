@@ -11,8 +11,8 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 .. _ImageJ: https://imagej.net
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
-:License: BSD 3-Clause
-:Version: 2025.2.20
+:License: BSD-3-Clause
+:Version: 2025.5.10
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -38,13 +38,17 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.9, 3.13.2 64-bit
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.3
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.2.18 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.0 (optional)
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.10, 3.13.3 64-bit
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.5
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.5.10 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.3 (optional)
 
 Revisions
 ---------
+
+2025.5.10
+
+- Support Python 3.14.
 
 2025.2.20
 
@@ -174,6 +178,7 @@ Write the ROIs to an ImageJ formatted TIFF file:
 
 .. code-block:: python
 
+    >>> import numpy
     >>> import tifffile
     >>> tifffile.imwrite(
     ...     '_test.tif',
