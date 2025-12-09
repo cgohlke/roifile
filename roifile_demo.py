@@ -9,14 +9,15 @@ segmentation from/to ImageJ TIFF files.
 
 import numpy
 from matplotlib import pyplot
-from roifile import ImagejRoi
 from skimage.measure import find_contours, label, regionprops
 from tifffile import TiffFile, imwrite
+
+from roifile import ImagejRoi
 
 
 def plot_image_overlays(image, overlays, **kwargs):
     """Plot image and overlays (bytes) using matplotlib."""
-    fig, ax = pyplot.subplots()
+    _fig, ax = pyplot.subplots()
     ax.imshow(image, cmap='gray')
     if not isinstance(overlays, list):
         overlays = [overlays]
@@ -29,7 +30,7 @@ def plot_image_overlays(image, overlays, **kwargs):
 # open an ImageJ TIFF file and read the image and overlay data
 # https://github.com/csachs/imagej-tiff-meta/
 # blob/b6a74daa8c2adf7023d20a447d9a2799614c857a/box.tif
-with TiffFile('tests/box.tif') as tif:
+with TiffFile('tests/data/box.tif') as tif:
     image = tif.pages[0].asarray()
     assert tif.imagej_metadata is not None
     overlays = tif.imagej_metadata['Overlays']
@@ -39,9 +40,7 @@ plot_image_overlays(image, overlays)
 # segment the image with scikit-image
 labeled = label(image > 0.5 * image.max())
 for region in regionprops(labeled):
-    if region.area > 10000:
-        labeled[labeled == region.label] = 0
-    elif region.area < 100:
+    if not 100 < region.area < 10000:
         labeled[labeled == region.label] = 0
 segmentation = 1.0 * (labeled > 0)
 
@@ -51,7 +50,9 @@ overlays = [
     for contour in find_contours(segmentation, level=0.9999)
 ]
 
-plot_image_overlays(image, overlays, lw=5)
+plot_image_overlays(image, overlays, linewidth=5)
 
 # write the image and overlays to a new ImageJ TIFF file
 imwrite('roi_test.tif', image, imagej=True, metadata={'Overlays': overlays})
+
+# mypy: allow-untyped-defs, allow-untyped-calls
