@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2025.12.12
+
+- Move tests to separate module.
+
 2025.5.10
 
 - Support Python 3.14.
