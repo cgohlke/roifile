@@ -1,6 +1,11 @@
 Revisions
 ---------
 
+2026.1.8
+
+- Improve code quality.
+- Drop support for Python 3.10.
+
 2025.12.12
 
 - Move tests to separate module.
