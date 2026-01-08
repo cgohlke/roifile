@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2025.12.12
+:Version: 2026.1.8
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -38,13 +38,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11 3.14.2 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.3.5
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.10.16 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.7 (optional)
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
+- `NumPy <https://pypi.org/project/numpy>`_ 2.4.0
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.12.20 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.1.8
+
+- Improve code quality.
+- Drop support for Python 3.10.
 
 2025.12.12
 
@@ -59,46 +64,6 @@ Revisions
 - Drop support for Python 3.9.
 
 2024.9.15
-
-- Improve typing.
-- Deprecate Python 3.9, support Python 3.13.
-
-2024.5.24
-
-- Fix docstring examples not correctly rendered on GitHub.
-
-2024.3.20
-
-- Fix writing generator of ROIs (#9).
-
-2024.1.10
-
-- Support text rotation.
-- Improve text rendering.
-- Avoid array copies.
-- Limit size read from files.
-
-2023.8.30
-
-- Fix linting issues.
-- Add py.typed marker.
-
-2023.5.12
-
-- Improve object repr and type hints.
-- Drop support for Python 3.8 and numpy < 1.21 (NEP29).
-
-2023.2.12
-
-- Delay import of zipfile.
-- Verify shape of coordinates on write.
-
-2022.9.19
-
-- Fix integer coordinates to -5000..60536 conforming with ImageJ (breaking).
-- Add subpixel_coordinates in frompoints for out-of-range integer coordinates.
-
-2022.7.29
 
 - …
 
