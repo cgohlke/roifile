@@ -1,6 +1,6 @@
 # roifile.py
 
-# Copyright (c) 2020-2025, Christoph Gohlke
+# Copyright (c) 2020-2026, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2025.12.12
+:Version: 2026.1.8
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,13 +65,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11 3.14.2 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.3.5
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.10.16 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.7 (optional)
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
+- `NumPy <https://pypi.org/project/numpy>`_ 2.4.0
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.12.20 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.1.8
+
+- Improve code quality.
+- Drop support for Python 3.10.
 
 2025.12.12
 
@@ -86,46 +91,6 @@ Revisions
 - Drop support for Python 3.9.
 
 2024.9.15
-
-- Improve typing.
-- Deprecate Python 3.9, support Python 3.13.
-
-2024.5.24
-
-- Fix docstring examples not correctly rendered on GitHub.
-
-2024.3.20
-
-- Fix writing generator of ROIs (#9).
-
-2024.1.10
-
-- Support text rotation.
-- Improve text rendering.
-- Avoid array copies.
-- Limit size read from files.
-
-2023.8.30
-
-- Fix linting issues.
-- Add py.typed marker.
-
-2023.5.12
-
-- Improve object repr and type hints.
-- Drop support for Python 3.8 and numpy < 1.21 (NEP29).
-
-2023.2.12
-
-- Delay import of zipfile.
-- Verify shape of coordinates on write.
-
-2022.9.19
-
-- Fix integer coordinates to -5000..60536 conforming with ImageJ (breaking).
-- Add subpixel_coordinates in frompoints for out-of-range integer coordinates.
-
-2022.7.29
 
 - …
 
@@ -219,7 +184,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2025.12.12'
+__version__ = '2026.1.8'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -295,7 +260,8 @@ def roiwrite(
 
     if name is not None:
         if isinstance(name, str):
-            raise ValueError("'name' is not an iterable of str")
+            msg = "'name' is not an iterable of str"
+            raise ValueError(msg)
         name = iter(name)
 
     import zipfile
@@ -529,7 +495,8 @@ class ImagejRoi:
 
             with tifffile.TiffFile(filename) as tif:
                 if tif.imagej_metadata is None:
-                    raise ValueError('file does not contain ImagejRoi')
+                    msg = 'file does not contain ImagejRoi'
+                    raise ValueError(msg)
                 rois: list[bytes] = []
                 if 'Overlays' in tif.imagej_metadata:
                     overlays = tif.imagej_metadata['Overlays']
@@ -574,7 +541,8 @@ class ImagejRoi:
     ) -> ImagejRoi:
         """Return ImagejRoi instance from bytes."""
         if data[:4] != b'Iout':
-            raise ValueError(f'not an ImageJ ROI {data[:4]!r}')
+            msg = f'not an ImageJ ROI {data[:4]!r}'
+            raise ValueError(msg)
 
         self = cls()
 
@@ -861,22 +829,24 @@ class ImagejRoi:
         ):
             if self.integer_coordinates is not None:
                 if self.integer_coordinates.shape != (self.n_coordinates, 2):
-                    raise ValueError(
+                    msg = (
                         'integer_coordinates.shape '
                         f'{self.integer_coordinates.shape} '
                         f'!= ({self.n_coordinates}, 2)'
                     )
+                    raise ValueError(msg)
                 coord = self.integer_coordinates.astype(
                     self.byteorder + 'i2', copy=False
                 )
                 extradata = coord.tobytes(order='F')
             if self.subpixel_coordinates is not None:
                 if self.subpixel_coordinates.shape != (self.n_coordinates, 2):
-                    raise ValueError(
+                    msg = (
                         'subpixel_coordinates.shape '
                         f'{self.subpixel_coordinates.shape} '
                         f'!= ({self.n_coordinates}, 2)'
                     )
+                    raise ValueError(msg)
                 coord = self.subpixel_coordinates.astype(
                     self.byteorder + 'f4', copy=False
                 )
@@ -1149,11 +1119,11 @@ class ImagejRoi:
                 n += 1
             elif op == 2 or op == 3:  # noqa: PLR1714
                 # QUADTO or CUBICTO
-                raise NotImplementedError(
-                    f'PathIterator command {op!r} not supported'
-                )
+                msg = f'PathIterator command {op!r} not supported'
+                raise NotImplementedError(msg)
             else:
-                raise RuntimeError(f'invalid PathIterator command {op!r}')
+                msg = f'invalid PathIterator command {op!r}'
+                raise RuntimeError(msg)
 
         coordinates.append(numpy.array(points, dtype=numpy.float32))
         return coordinates
@@ -1170,7 +1140,8 @@ class ImagejRoi:
             return -5000
         if -32768 <= value <= 0:
             return int(value)
-        raise ValueError(f'{value=} out of range')
+        msg = f'{value=} out of range'
+        raise ValueError(msg)
 
     @property
     def composite(self) -> bool:
