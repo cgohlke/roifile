@@ -12,7 +12,8 @@ def search(pattern: str, string: str, flags: int = 0) -> str:
     """Return first match of pattern in string."""
     match = re.search(pattern, string, flags)
     if match is None:
-        raise ValueError(f'{pattern!r} not found')
+        msg = f'{pattern=!r} not found'
+        raise ValueError(msg)
     return match.groups()[0]
 
 
@@ -47,7 +48,7 @@ readme = search(
     re.MULTILINE | re.DOTALL,
 )
 readme = '\n'.join(
-    [description, '=' * len(description)] + readme.splitlines()[1:]
+    [description, '=' * len(description), *readme.splitlines()[1:]]
 )
 
 if 'sdist' in sys.argv:
@@ -99,7 +100,7 @@ setup(
     packages=['roifile'],
     package_data={'roifile': ['py.typed']},
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
-    python_requires='>=3.10',
+    python_requires='>=3.11',
     install_requires=['numpy'],
     extras_require={'all': ['matplotlib', 'tifffile']},
     platforms=['any'],
@@ -109,7 +110,6 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
