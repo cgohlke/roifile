@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.8
+:Version: 2026.1.20
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -66,12 +66,17 @@ This revision was tested with the following requirements and dependencies
 (other versions may work):
 
 - `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.4.0
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2025.12.20 (optional)
+- `NumPy <https://pypi.org/project/numpy>`_ 2.4.1
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.14 (optional)
 - `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.1.20
+
+- Fix reading ImagejRoi.props.
+- Add ImagejRoi.properties property to decode and encode ImagejRoi.props.
 
 2026.1.8
 
@@ -184,7 +189,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2026.1.8'
+__version__ = '2026.1.20'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -199,6 +204,7 @@ __all__ = [
     'roiwrite',
 ]
 
+import contextlib
 import enum
 import logging
 import os
@@ -591,14 +597,14 @@ class ImagejRoi:
         self.options = ROI_OPTIONS(options)
 
         if self.subpixelrect:
-            (self.xd, self.yd, self.widthd, self.heightd) = struct.unpack(
+            self.xd, self.yd, self.widthd, self.heightd = struct.unpack(
                 self.byteorder + 'ffff', data[18:34]
             )
         elif self.roitype == ROI_TYPE.LINE or (
             self.roitype == ROI_TYPE.FREEHAND
             and self.subtype in {ROI_SUBTYPE.ELLIPSE, ROI_SUBTYPE.ROTATED_RECT}
         ):
-            (self.x1, self.y1, self.x2, self.y2) = struct.unpack(
+            self.x1, self.y1, self.x2, self.y2 = struct.unpack(
                 self.byteorder + 'ffff', data[18:34]
             )
         elif self.n_coordinates == 0:
@@ -633,7 +639,7 @@ class ImagejRoi:
 
             if roi_props_offset > 0 and roi_props_length > 0:
                 props = data[
-                    roi_props_offset : name_offset + roi_props_length * 2
+                    roi_props_offset : roi_props_offset + roi_props_length * 2
                 ]
                 self.props = props.decode(self.utf16)
 
@@ -715,6 +721,8 @@ class ImagejRoi:
     def tofile(
         self,
         filename: os.PathLike[Any] | str,
+        /,
+        *,
         name: str | None = None,
         mode: Literal['r', 'w', 'x', 'a'] | None = None,
     ) -> None:
@@ -1078,7 +1086,7 @@ class ImagejRoi:
         return [coords] if multi else coords
 
     def hexcolor(self, b: bytes, /, default: str | None = None) -> str | None:
-        """Return color (bytes) as hex triplet or None if black."""
+        """Return color (bytes) as hex triplet or default if black."""
         if b == ROI_COLOR_NONE:
             return default
         if self.byteorder == '>':
@@ -1129,7 +1137,7 @@ class ImagejRoi:
         return coordinates
 
     @staticmethod
-    def min_int_coord(value: int | None = None) -> int:
+    def min_int_coord(value: int | None = None, /) -> int:
         """Return minimum integer coordinate value.
 
         The default, -5000, is used by ImageJ.
@@ -1181,6 +1189,41 @@ class ImagejRoi:
             tzc = int(self.counter_positions.max())
             name = f'{tzc:05}-' + name
         return name
+
+    @property
+    def properties(self) -> dict[str, Any]:
+        """Return ImagejRoi.props as dictionary."""
+        val: Any
+        props = {}
+        for line in self.props.splitlines():
+            if ':' in line:
+                key, val = line.split(':', 1)
+                key = key.strip()
+                val = val.strip()
+                if val == 'No':
+                    val = False
+                elif val == 'Yes':
+                    val = True
+                else:
+                    try:
+                        val = int(val)
+                    except ValueError:
+                        with contextlib.suppress(ValueError):
+                            val = float(val)
+                props[key] = val
+        return props
+
+    @properties.setter
+    def properties(self, value: dict[str, Any], /) -> None:
+        """Set ImagejRoi.props from dictionary."""
+        lines = []
+        for item in sorted(value.items()):
+            key, val = item
+            if isinstance(val, bool):
+                val = 'Yes' if val else 'No'
+            # TODO: does float need specific format?
+            lines.append(f'{key}: {val}\n')
+        self.props = ''.join(lines)
 
     @property
     def utf16(self) -> str:
