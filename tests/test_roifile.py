@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.1.8
+:Version: 2026.1.20
 
 """
 
@@ -49,6 +49,10 @@ from matplotlib import pyplot
 
 import roifile
 from roifile import (
+    ROI_COLOR_NONE,
+    ROI_OPTIONS,
+    ROI_POINT_SIZE,
+    ROI_POINT_TYPE,
     ROI_SUBTYPE,
     ROI_TYPE,
     ImagejRoi,
@@ -69,31 +73,49 @@ def test_version():
     assert ver in roifile.__doc__
 
 
-def test_roifile():
-    """Test ImagejRoi class."""
-    # TODO: split into smaller test functions
-
-    # test ROIs from a ZIP file
+def test_read_zip_file():
+    """Test reading ROIs from a ZIP file."""
     rois: Any = ImagejRoi.fromfile(DATA / 'ijzip.zip')
     assert isinstance(rois, list)
     assert len(rois) == 7
     for roi in rois:
         assert roi == ImagejRoi.frombytes(roi.tobytes())
         roi.coordinates()
+        _ = roi.properties
         str(roi)
 
-    # re-write ROIs to a ZIP file
+
+def test_write_zip_file():
+    """Test writing ROIs to a ZIP file."""
+    rois: Any = ImagejRoi.fromfile(DATA / 'ijzip.zip')
+
     with contextlib.suppress(OSError):
         os.remove('_test.zip')
 
     def roi_iter() -> Iterator[ImagejRoi]:
-        # issue #9
         yield from rois
 
     roiwrite('_test.zip', roi_iter())
     assert roiread('_test.zip') == rois
 
-    # verify box_combined
+
+def test_read_tiff_file():
+    """Test reading ROIs from a TIFF file."""
+    rois = roiread(DATA / 'IJMetadata.tif')
+    assert isinstance(rois, list)
+    for roi in rois:
+        assert roi == ImagejRoi.frombytes(roi.tobytes())
+        roi.coordinates()
+        str(roi)
+
+
+def test_empty_roi():
+    """Test empty ROI equality."""
+    assert ImagejRoi() == ImagejRoi()
+
+
+def test_box_combined():
+    """Test box_combined composite ROI."""
     rois = roiread(DATA / 'box_combined.roi')
     assert isinstance(rois, ImagejRoi)
     roi = rois
@@ -111,9 +133,13 @@ def test_roifile():
     assert roi.multi_coordinates[0] == 0.0
     with open(DATA / 'box_combined.roi', 'rb') as fh:
         expected = fh.read()
+    assert roi.properties == {}
     assert roi.tobytes() == expected
     str(roi)
 
+
+def test_frompoints_integer():
+    """Test creating ROI from integer coordinates."""
     roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.left == 1
@@ -121,6 +147,9 @@ def test_roifile():
     assert roi.right == 6
     assert roi.bottom == 7
 
+
+def test_frompoints_float():
+    """Test creating ROI from float coordinates."""
     roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.left == 1
@@ -128,6 +157,9 @@ def test_roifile():
     assert roi.right == 7
     assert roi.bottom == 8
 
+
+def test_frompoints_large_coordinates():
+    """Test creating ROI from large coordinate values."""
     roi = ImagejRoi.frompoints([[-5000, 60535], [60534, 65534]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
     assert roi.left == -5000, roi.left
@@ -135,24 +167,9 @@ def test_roifile():
     assert roi.right == 60535, roi.right
     assert roi.bottom == 65535, roi.bottom
 
-    # issue #7
-    roi = ImagejRoi.frompoints(
-        numpy.load(DATA / 'issue7.npy').astype(numpy.float32)
-    )
-    assert roi == ImagejRoi.frombytes(roi.tobytes())
-    assert roi.left == 28357, roi.left
-    assert roi.top == 42200, roi.top  # not -23336
-    assert roi.right == 28453, roi.right
-    assert roi.bottom == 42284, roi.bottom  # not -23252
-    coords = roi.coordinates()
-    assert roi.integer_coordinates is not None
-    assert roi.subpixel_coordinates is not None
-    assert roi.integer_coordinates[0, 0] == 0
-    assert roi.integer_coordinates[0, 1] == 15
-    assert roi.subpixel_coordinates[0, 0] == 28357.0
-    assert roi.subpixel_coordinates[0, 1] == 42215.0
 
-    # rotated text
+def test_rotated_text():
+    """Test reading rotated text ROI."""
     rois = roiread(DATA / 'text_rotated.roi')
     assert isinstance(rois, ImagejRoi)
     roi = rois
@@ -173,15 +190,48 @@ def test_roifile():
     assert roi.tobytes() == expected
     str(roi)
 
-    # read a ROI from a TIFF file
-    rois = roiread(DATA / 'IJMetadata.tif')
+
+def test_properties():
+    """Test ROI properties."""
+    rois = ImagejRoi.fromfile(DATA / '27197299958_88cf5966d3_b.tif')
     assert isinstance(rois, list)
+    assert len(rois) == 8
+
     for roi in rois:
+        roi.props.endswith('\n')
         assert roi == ImagejRoi.frombytes(roi.tobytes())
         roi.coordinates()
         str(roi)
 
-    assert ImagejRoi() == ImagejRoi()
+    roi = rois[0]
+    assert roi.roitype == ROI_TYPE.LINE
+    assert roi.subtype == ROI_SUBTYPE.UNDEFINED
+    assert roi.options == (
+        ROI_OPTIONS.OVERLAY_LABELS | ROI_OPTIONS.OVERLAY_BACKGROUNDS
+    )
+    assert roi.version == 228
+    assert roi.name == 'Plat'
+    assert roi.stroke_color == b'\xff\xff\x00\x00'
+    assert roi.fill_color == ROI_COLOR_NONE
+    assert len(roi.props) == 418
+    assert roi.props.startswith('%Area: 0\n')
+    assert roi.props.endswith('Y: 98.500\n')
+
+    props = roi.properties
+    assert isinstance(props, dict)
+    assert len(props) == 26
+    assert props['%Area'] == 0
+    assert props['Y'] == 98.5
+    assert props['Angle'] == -1.193
+    assert props['Roi'] == 'Plat'
+    assert not props['Poor_Quality']
+
+    roi.properties = props  # encode roi.props
+    assert roi.properties == props  # decode roi.props
+    assert len(roi.props) == 415  # float formatting different
+    assert roi.props.startswith('%Area: 0\n')
+    assert roi.props.endswith('Y: 98.5\n')
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
 
 
 def test_zipfile():
@@ -204,6 +254,25 @@ def test_pickle():
         rois, pickle.loads(fh.getvalue()), strict=True  # noqa: S301
     ):
         assert roi0 == roi1
+
+
+def test_issue_7():
+    """Test issue #7: large coordinate values."""
+    roi = ImagejRoi.frompoints(
+        numpy.load(DATA / 'issue7.npy').astype(numpy.float32)
+    )
+    assert roi == ImagejRoi.frombytes(roi.tobytes())
+    assert roi.left == 28357, roi.left
+    assert roi.top == 42200, roi.top  # not -23336
+    assert roi.right == 28453, roi.right
+    assert roi.bottom == 42284, roi.bottom  # not -23252
+    _ = roi.coordinates()
+    assert roi.integer_coordinates is not None
+    assert roi.subpixel_coordinates is not None
+    assert roi.integer_coordinates[0, 0] == 0
+    assert roi.integer_coordinates[0, 1] == 15
+    assert roi.subpixel_coordinates[0, 0] == 28357.0
+    assert roi.subpixel_coordinates[0, 1] == 42215.0
 
 
 def test_issue_9():
