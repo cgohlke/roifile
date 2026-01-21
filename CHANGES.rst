@@ -1,6 +1,11 @@
 Revisions
 ---------
 
+2026.1.20
+
+- Fix reading ImagejRoi.props.
+- Add ImagejRoi.properties property to decode and encode ImagejRoi.props.
+
 2026.1.8
 
 - Improve code quality.
