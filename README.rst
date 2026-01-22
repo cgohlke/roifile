@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.20
+:Version: 2026.1.22
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -45,6 +45,10 @@ This revision was tested with the following requirements and dependencies
 
 Revisions
 ---------
+
+2026.1.22
+
+- Fix boolean codec in ImagejRoi.properties.
 
 2026.1.20
 
