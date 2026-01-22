@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.1.20
+:Version: 2026.1.22
 
 """
 
@@ -214,8 +214,8 @@ def test_properties():
     assert roi.stroke_color == b'\xff\xff\x00\x00'
     assert roi.fill_color == ROI_COLOR_NONE
     assert len(roi.props) == 418
-    assert roi.props.startswith('%Area: 0\n')
-    assert roi.props.endswith('Y: 98.500\n')
+    assert roi.props.startswith('%Area: 0\nAbutment_implant_misfit: No\n')
+    assert roi.props.endswith('X: 48\nY: 98.500\n')
 
     props = roi.properties
     assert isinstance(props, dict)
@@ -224,14 +224,19 @@ def test_properties():
     assert props['Y'] == 98.5
     assert props['Angle'] == -1.193
     assert props['Roi'] == 'Plat'
-    assert not props['Poor_Quality']
+    assert props['Poor_Quality'] == 'No'
 
     roi.properties = props  # encode roi.props
     assert roi.properties == props  # decode roi.props
-    assert len(roi.props) == 415  # float formatting different
-    assert roi.props.startswith('%Area: 0\n')
-    assert roi.props.endswith('Y: 98.5\n')
+    assert len(roi.props) == 415
+    assert roi.props.startswith('%Area: 0\nAbutment_implant_misfit: No\n')
+    assert roi.props.endswith('X: 48\nY: 98.5\n')  # float formatting different
     assert roi == ImagejRoi.frombytes(roi.tobytes())
+
+    props['Bool'] = False
+    roi.properties = props
+    assert roi.properties['Bool'] is False
+    assert 'BY: 98\nBool: false\n' in roi.props  # sorted by key
 
 
 def test_zipfile():
