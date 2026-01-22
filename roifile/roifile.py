@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.20
+:Version: 2026.1.22
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -72,6 +72,10 @@ This revision was tested with the following requirements and dependencies
 
 Revisions
 ---------
+
+2026.1.22
+
+- Fix boolean codec in ImagejRoi.properties.
 
 2026.1.20
 
@@ -189,7 +193,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2026.1.20'
+__version__ = '2026.1.22'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -1200,10 +1204,10 @@ class ImagejRoi:
                 key, val = line.split(':', 1)
                 key = key.strip()
                 val = val.strip()
-                if val == 'No':
-                    val = False
-                elif val == 'Yes':
+                if val == 'true':
                     val = True
+                elif val == 'false':
+                    val = False
                 else:
                     try:
                         val = int(val)
@@ -1220,7 +1224,7 @@ class ImagejRoi:
         for item in sorted(value.items()):
             key, val = item
             if isinstance(val, bool):
-                val = 'Yes' if val else 'No'
+                val = 'true' if val else 'false'
             # TODO: does float need specific format?
             lines.append(f'{key}: {val}\n')
         self.props = ''.join(lines)
