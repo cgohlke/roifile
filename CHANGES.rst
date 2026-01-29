@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2026.1.29
+
+- Fix code review issues.
+
 2026.1.22
 
 - Fix boolean codec in ImagejRoi.properties.
