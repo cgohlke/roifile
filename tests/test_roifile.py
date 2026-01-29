@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.1.22
+:Version: 2026.1.29
 
 """
 
@@ -309,14 +309,14 @@ def test_issue_9():
 
 
 @pytest.mark.parametrize(
-    'fname', glob.glob('*.roi', root_dir=DATA, recursive=False)
+    'filename', glob.glob('*.roi', root_dir=DATA, recursive=False)
 )
-def test_glob_roi(fname):
+def test_glob_roi(filename):
     """Test read all ROI files."""
-    if 'defective' in fname:
+    if 'defective' in filename:
         pytest.xfail(reason='file is marked defective')
-    fname = DATA / fname
-    roi = ImagejRoi.fromfile(fname)
+    filename = DATA / filename
+    roi = ImagejRoi.fromfile(filename)
     assert isinstance(roi, ImagejRoi)
     str(roi)
     roi.plot(show=False)
@@ -324,14 +324,14 @@ def test_glob_roi(fname):
 
 
 @pytest.mark.parametrize(
-    'fname', glob.glob('*.zip', root_dir=DATA, recursive=False)
+    'filename', glob.glob('*.zip', root_dir=DATA, recursive=False)
 )
-def test_glob_zip(fname):
+def test_glob_zip(filename):
     """Test read all ZIP files."""
-    if 'defective' in fname:
+    if 'defective' in filename:
         pytest.xfail(reason='file is marked defective')
-    fname = DATA / fname
-    rois = roiread(fname)
+    filename = DATA / filename
+    rois = roiread(filename)
     assert isinstance(rois, list)
     for roi in rois:
         str(roi)
