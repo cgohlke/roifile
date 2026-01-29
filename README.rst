@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.22
+:Version: 2026.1.29
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -40,11 +40,15 @@ This revision was tested with the following requirements and dependencies
 
 - `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
 - `NumPy <https://pypi.org/project/numpy>`_ 2.4.1
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.14 (optional)
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.28 (optional)
 - `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.1.29
+
+- Fix code review issues.
 
 2026.1.22
 
