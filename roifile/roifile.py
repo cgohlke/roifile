@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.22
+:Version: 2026.1.29
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -67,11 +67,15 @@ This revision was tested with the following requirements and dependencies
 
 - `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
 - `NumPy <https://pypi.org/project/numpy>`_ 2.4.1
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.14 (optional)
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.28 (optional)
 - `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.1.29
+
+- Fix code review issues.
 
 2026.1.22
 
@@ -193,7 +197,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2026.1.22'
+__version__ = '2026.1.29'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -282,7 +286,13 @@ def roiwrite(
             if name is None:
                 n = r.name if r.name else r.autoname
             else:
-                n = next(name)
+                try:
+                    n = next(name)
+                except StopIteration:
+                    msg = "'name' iterator has fewer items than 'roi'"
+                    raise ValueError(msg) from None
+            if not n:
+                n = r.autoname
             n = n if n[-4:].lower() == '.roi' else n + '.roi'
             with zf.open(n, 'w') as fh:
                 fh.write(r.tobytes())
@@ -461,6 +471,9 @@ class ImagejRoi:
         self.name = name
 
         coords = numpy.array(points, copy=True)
+        if coords.size == 0:
+            msg = 'points array is empty'
+            raise ValueError(msg)
         if coords.dtype.kind == 'f' or (
             numpy.any(coords > 60000) or numpy.any(coords < -5000)
         ):
@@ -550,6 +563,9 @@ class ImagejRoi:
         min_int_coord: int | None = None,
     ) -> ImagejRoi:
         """Return ImagejRoi instance from bytes."""
+        if len(data) < 64:
+            msg = f'ImageJ ROI data too short: {len(data)} < 64 bytes'
+            raise ValueError(msg)
         if data[:4] != b'Iout':
             msg = f'not an ImageJ ROI {data[:4]!r}'
             raise ValueError(msg)
@@ -586,14 +602,14 @@ class ImagejRoi:
             self.top += 65536
         if self.bottom < min_int_coord:
             self.bottom += 65536
-        if self.bottom < 0 and self.bottom < self.top:
+        if self.bottom < self.top:
             self.bottom += 65536
 
         if self.left < min_int_coord:
             self.left += 65536
         if self.right < min_int_coord:
             self.right += 65536
-        if self.right < 0 and self.right < self.left:
+        if self.right < self.left:
             self.right += 65536
 
         self.roitype = ROI_TYPE(roitype)
@@ -638,14 +654,26 @@ class ImagejRoi:
             )
 
             if name_offset > 0 and name_length > 0:
-                name = data[name_offset : name_offset + name_length * 2]
-                self.name = name.decode(self.utf16)
+                name_end = name_offset + name_length * 2
+                if name_end <= len(data):
+                    name = data[name_offset:name_end]
+                    self.name = name.decode(self.utf16)
+                else:
+                    logger().warning(
+                        f'ImagejRoi name exceeds data size: '
+                        f'{name_end} > {len(data)}'
+                    )
 
             if roi_props_offset > 0 and roi_props_length > 0:
-                props = data[
-                    roi_props_offset : roi_props_offset + roi_props_length * 2
-                ]
-                self.props = props.decode(self.utf16)
+                props_end = roi_props_offset + roi_props_length * 2
+                if props_end <= len(data):
+                    props = data[roi_props_offset:props_end]
+                    self.props = props.decode(self.utf16)
+                else:
+                    logger().warning(
+                        f'ImagejRoi props exceeds data size: '
+                        f'{props_end} > {len(data)}'
+                    )
 
             if counters_offset > 0:
                 counters: NDArray[numpy.uint32] = numpy.ndarray(
@@ -1392,11 +1420,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         files = argv[1:]
 
-    for fname in files:
-        print(fname)  # noqa: T201
+    for filename in files:
+        print(filename)  # noqa: T201
         try:
-            rois = ImagejRoi.fromfile(fname)
-            title = os.path.split(fname)[-1]
+            rois = ImagejRoi.fromfile(filename)
+            title = os.path.split(filename)[-1]
             if isinstance(rois, list):
                 for roi in rois:
                     print(roi, '\n')  # noqa: T201
@@ -1412,7 +1440,7 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             if sys.flags.dev_mode:
                 raise
-            print(fname, exc)  # noqa: T201
+            print(filename, exc)  # noqa: T201
             continue
     return 0
 
