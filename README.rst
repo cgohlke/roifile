@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.1.29
+:Version: 2026.2.10
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -38,13 +38,24 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.4.1
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.12, 3.14.3 64-bit
+- `NumPy <https://pypi.org/project/numpy>`_ 2.4.2
 - `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.28 (optional)
+- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.1.14 (optional)
 - `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
 
 Revisions
 ---------
+
+2026.2.10
+
+- Revise wrapping of integer coordinates again (breaking).
+- Bump file version to 229.
+- Support groups > 255 (untested).
+- Support IMAGE subtype (requires imagecodecs).
+- Add point_type and point_size properties for point ROIs.
+- Do not return empty paths in path2coords.
+- Improve documentation.
 
 2026.1.29
 
@@ -74,10 +85,6 @@ Revisions
 
 2025.2.20
 
-- Drop support for Python 3.9.
-
-2024.9.15
-
 - …
 
 Refer to the CHANGES file for older revisions.
@@ -96,17 +103,20 @@ Other Python packages handling ImageJ ROIs:
 
 - `ijpython_roi <https://github.com/dwaithe/ijpython_roi>`_
 - `read-roi <https://github.com/hadim/read-roi/>`_
+- `sdt-python <https://github.com/schuetzgroup/sdt-python>`_
 - `napari_jroitools <https://github.com/jayunruh/napari_jroitools>`_
 
 Examples
 --------
 
-Create a new ImagejRoi instance from an array of x, y coordinates:
+Create a new ImagejRoi instance from an array of x, y coordinates,
+then set ROI properties:
 
 .. code-block:: python
 
     >>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
     >>> roi.roitype = ROI_TYPE.POINT
+    >>> roi.point_size = ROI_POINT_SIZE.LARGE
     >>> roi.options |= ROI_OPTIONS.SHOW_LABELS
 
 Export the instance to an ImageJ ROI formatted byte string or file:
