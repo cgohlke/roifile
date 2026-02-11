@@ -102,7 +102,9 @@ setup(
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
     python_requires='>=3.11',
     install_requires=['numpy'],
-    extras_require={'all': ['matplotlib', 'tifffile']},
+    extras_require={
+        'all': ['matplotlib', 'tifffile', 'imagecodecs>=2026.1.14']
+    },
     platforms=['any'],
     classifiers=[
         'Development Status :: 4 - Beta',
