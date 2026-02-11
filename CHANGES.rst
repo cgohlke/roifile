@@ -1,6 +1,16 @@
 Revisions
 ---------
 
+2026.2.10
+
+- Revise wrapping of integer coordinates again (breaking).
+- Bump file version to 229.
+- Support groups > 255 (untested).
+- Support IMAGE subtype (requires imagecodecs).
+- Add point_type and point_size properties for point ROIs.
+- Do not return empty paths in path2coords.
+- Improve documentation.
+
 2026.1.29
 
 - Fix code review issues.
