@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.1.29
+:Version: 2026.2.10
 
 """
 
@@ -147,6 +147,35 @@ def test_frompoints_integer():
     assert roi.right == 6
     assert roi.bottom == 7
 
+    # test ROI_POINT_SIZE
+    roi.roitype = ROI_TYPE.POINT
+    roi.point_size = ROI_POINT_SIZE.SMALL
+    assert roi.point_size == ROI_POINT_SIZE.SMALL
+    roi.point_size = ROI_POINT_SIZE.LARGE
+    assert roi.point_size == ROI_POINT_SIZE.LARGE
+    roi.point_size = 17
+    assert roi.point_size == ROI_POINT_SIZE.XXL
+    roi.point_size = 100
+    assert roi.point_size == ROI_POINT_SIZE.UNKNOWN
+    assert roi.point_size.value == 100
+
+    # test ROI_POINT_TYPE
+    roi.point_type = ROI_POINT_TYPE.CROSS
+    assert roi.point_type == ROI_POINT_TYPE.CROSS
+    roi.point_type = ROI_POINT_TYPE.DOT
+    assert roi.point_type == ROI_POINT_TYPE.DOT
+    roi.point_type = 3
+    assert roi.point_type == ROI_POINT_TYPE.CIRCLE
+    roi.point_type = 100
+    assert roi.point_type == ROI_POINT_TYPE.UNKNOWN
+    assert roi.point_type.value == 100
+
+    # verify round-trip with point properties
+    roi2 = ImagejRoi.frombytes(roi.tobytes())
+    assert roi2.point_size == roi.point_size
+    assert roi2.point_type == roi.point_type
+    assert roi2 == roi
+
 
 def test_frompoints_float():
     """Test creating ROI from float coordinates."""
@@ -166,6 +195,97 @@ def test_frompoints_large_coordinates():
     assert roi.top == 60535, roi.top
     assert roi.right == 60535, roi.right
     assert roi.bottom == 65535, roi.bottom
+
+
+@pytest.mark.parametrize(
+    'points',
+    [
+        [[0, 0], [10, 10]],  # small positive coords
+        [[-5000, 0], [100, 100]],  # boundary at -5000
+        [[0, 0], [60535, 60535]],  # large positive at boundary
+        [[-5000, -5000], [60535, 60535]],  # mixed range
+        [[0, 0], [32767, 32768]],  # near int16 max boundary
+        [[0, 0], [65534, 65535]],  # near uint16 max boundary
+        [[-5000, 60535], [60534, 65534]],  # original issue #13
+    ],
+)
+def test_coordinate_wrapping_roundtrip(points):
+    """Test that coordinates correctly roundtrip through int16 wrapping."""
+    roi1 = ImagejRoi.frompoints(points)
+    data = roi1.tobytes()
+    roi2 = ImagejRoi.frombytes(data)
+
+    assert roi1 == roi2
+    assert numpy.array_equal(
+        roi1.integer_coordinates, roi2.integer_coordinates
+    )
+    assert numpy.array_equal(roi1.coordinates(), roi2.coordinates())
+
+
+def test_min_int_coord_parameter():
+    """Test that min_int_coord parameter is respected."""
+    # test with default -5000
+    roi = ImagejRoi.frompoints([[-5000, 0], [100, 100]])
+    data = roi.tobytes()
+    roi_default = ImagejRoi.frombytes(data)
+    assert roi_default == roi
+
+    # test with -32768 (full int16 range)
+    roi2 = ImagejRoi.frompoints([[-32768, 0], [100, 100]])
+    data2 = roi2.tobytes()
+    roi_int16 = ImagejRoi.frombytes(data2, min_int_coord=-32768)
+    assert roi_int16 == roi2
+
+    # test with 0 (uint16 range, no negative coordinates)
+    roi3 = ImagejRoi.frompoints([[0, 0], [60535, 60535]])
+    data3 = roi3.tobytes()
+    roi_uint16 = ImagejRoi.frombytes(data3, min_int_coord=0)
+    assert roi_uint16 == roi3
+
+
+@pytest.mark.parametrize('kind', ['uint8', 'uint16', 'float32', 'rgb'])
+def test_image_subtype(kind):
+    """Test creating IMAGE subtype ROI."""
+    image: numpy.ndarray
+    if kind == 'rgb':
+        image = numpy.arange(300, dtype=numpy.uint8).reshape(10, 10, 3)
+    else:
+        image = numpy.arange(100, dtype=kind).reshape(10, 10)
+
+    roi = ImagejRoi()
+    roi.version = 228
+    roi.name = 'Image ROI'
+    roi.roitype = ROI_TYPE.RECT
+    roi.subtype = ROI_SUBTYPE.IMAGE
+    roi.left = 50
+    roi.top = 100
+    roi.image_opacity = 128
+    roi.image = image
+
+    with open(f'{kind}.roi', 'wb') as fh:
+        fh.write(roi.tobytes())
+
+    assert roi.subtype == ROI_SUBTYPE.IMAGE
+    assert roi.image_size > 0
+    assert roi.image_data is not None
+    assert roi.right == roi.left + image.shape[1]
+    assert roi.bottom == roi.top + image.shape[0]
+
+    # test round-trip
+    roi2 = ImagejRoi.frombytes(roi.tobytes())
+    assert roi2 == roi
+    assert roi2.subtype == ROI_SUBTYPE.IMAGE
+    assert roi2.image_size == roi.image_size
+    assert roi2.image_opacity == 128
+
+    # test that image can be decoded
+    decoded_image = roi2.image
+    assert decoded_image is not None
+    assert decoded_image.shape == image.shape
+    numpy.testing.assert_array_equal(decoded_image, image)
+
+    str(roi)
+    str(roi2)
 
 
 def test_rotated_text():
