@@ -1,5 +1,8 @@
 # roifile_demo.py
 
+# Copyright (c) Christoph Gohlke
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Demonstrate the roifile module.
 
 Use the roifile and tifffile modules to read and write the results of image
