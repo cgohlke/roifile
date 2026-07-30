@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.2.10
+:Version: 2026.7.30
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -65,14 +65,21 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.12, 3.14.3 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.4.2
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.28 (optional)
-- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.1.14 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
+- `CPython <https://www.python.org>`_ 3.12.10, 3.13.14, 3.14.6, 3.15.0b4 64-bit
+- `Numpy <https://pypi.org/project/numpy>`_ 2.5.1
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.7.14 (optional)
+- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.6.6 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.1 (optional)
 
 Revisions
 ---------
+
+2026.7.30
+
+- Use Java compatible rounding for subpixel coordinates (breaking).
+- Recover roi names stored as Latin-1 instead of UTF-16.
+- Drop support for Python 3.11 and numpy 2.0 (SPEC0).
+- Support Python 3.15.
 
 2026.2.10
 
@@ -207,7 +214,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2026.2.10'
+__version__ = '2026.7.30'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -332,26 +339,37 @@ class ROI_TYPE(enum.IntEnum):
 
     UNKNOWN = -1
     """Undocumented or unknown ROI type."""
+
     POLYGON = 0
     """Polygon with straight edges."""
+
     RECT = 1
     """Rectangle."""
+
     OVAL = 2
     """Oval/ellipse."""
+
     LINE = 3
     """Straight line."""
+
     FREELINE = 4
     """Freehand line."""
+
     POLYLINE = 5
     """Polyline with straight segments."""
+
     NOROI = 6
     """No ROI."""
+
     FREEHAND = 7
     """Freehand polygon."""
+
     TRACED = 8
     """Traced polygon."""
+
     ANGLE = 9
     """Angle measurement."""
+
     POINT = 10
     """Point or multi-point."""
 
@@ -368,16 +386,22 @@ class ROI_SUBTYPE(enum.IntEnum):
 
     UNKNOWN = -1
     """Undocumented or unknown ROI subtype."""
+
     UNDEFINED = 0
     """No subtype specified."""
+
     TEXT = 1
     """Text overlay."""
+
     ARROW = 2
     """Arrow overlay."""
+
     ELLIPSE = 3
     """Ellipse (fitted)."""
+
     IMAGE = 4
     """Embedded image overlay."""
+
     ROTATED_RECT = 5
     """Rotated rectangle."""
 
@@ -394,36 +418,52 @@ class ROI_OPTIONS(enum.IntFlag):
 
     NONE = 0
     """No options."""
+
     SPLINE_FIT = 1
     """Spline fit enabled."""
+
     DOUBLE_HEADED = 2
     """Double-headed arrow."""
+
     OUTLINE = 4
     """Outline only (no fill)."""
+
     OVERLAY_LABELS = 8
     """Show overlay labels."""
+
     OVERLAY_NAMES = 16
     """Show overlay names."""
+
     OVERLAY_BACKGROUNDS = 32
     """Show overlay backgrounds."""
+
     OVERLAY_BOLD = 64
     """Bold overlay text."""
+
     SUB_PIXEL_RESOLUTION = 128
     """Subpixel resolution coordinates."""
+
     DRAW_OFFSET = 256
     """Draw with offset."""
+
     ZERO_TRANSPARENT = 512
     """Zero values transparent."""
+
     SHOW_LABELS = 1024
     """Show point labels."""
+
     SCALE_LABELS = 2048
     """Scale labels with zoom."""
+
     PROMPT_BEFORE_DELETING = 4096
     """Prompt before deletion."""
+
     SCALE_STROKE_WIDTH = 8192
     """Scale stroke width with zoom."""
+
     UNKNOWN_14 = 16384
     """Undocumented or unknown option (bit 14)."""
+
     UNKNOWN_15 = 32768
     """Undocumented or unknown option (bit 15)."""
 
@@ -433,13 +473,17 @@ class ROI_POINT_TYPE(enum.IntEnum):
 
     UNKNOWN = -1
     """Undocumented or unknown point type."""
+
     HYBRID = 0
     """Hybrid marker (cross with dot)."""
+
     CROSS = 1
     """Cross/crosshair marker."""
     # CROSSHAIR = 1  # alias for CROSS in ImageJ, not needed here
+
     DOT = 2
     """Dot/circle marker (filled)."""
+
     CIRCLE = 3
     """Circle marker (outline)."""
 
@@ -456,18 +500,25 @@ class ROI_POINT_SIZE(enum.IntEnum):
 
     UNKNOWN = -1
     """Undocumented or unknown point size."""
+
     TINY = 1
     """Tiny marker (1px)."""
+
     SMALL = 3
     """Small marker (3px)."""
+
     MEDIUM = 5
     """Medium marker (5px)."""
+
     LARGE = 7
     """Large marker (7px)."""
+
     EXTRA_LARGE = 11
     """Extra large marker (11px)."""
+
     XXL = 17
     """XXL marker (17px)."""
+
     XXXL = 25
     """XXXL marker (25px)."""
 
@@ -489,100 +540,148 @@ class ImagejRoi:
 
     byteorder: Literal['>', '<'] = '>'
     """Byte order: '>' for big-endian, '<' for little-endian."""
+
     roitype: ROI_TYPE = ROI_TYPE.POLYGON
     """ROI type (polygon, rect, oval, line, point, etc)."""
+
     subtype: ROI_SUBTYPE = ROI_SUBTYPE.UNDEFINED
     """Subtype for specialized ROIs (text, arrow, ellipse, image, etc)."""
+
     options: ROI_OPTIONS = ROI_OPTIONS.NONE
     """Bit flags for ROI options and features."""
+
     name: str = ''
     """ROI name."""
+
     props: str = ''
     """Properties string containing key:value pairs."""
+
     version: int = 229
     """File format version number."""
+
     top: int = 0
     """Bounding rectangle top coordinate."""
+
     left: int = 0
     """Bounding rectangle left coordinate."""
+
     bottom: int = 0
     """Bounding rectangle bottom coordinate."""
+
     right: int = 0
     """Bounding rectangle right coordinate."""
+
     n_coordinates: int = 0
     """Number of coordinate pairs."""
+
     stroke_width: int = 0
     """Stroke width in pixels (also point_size for POINT ROIs version 226+)."""
+
     shape_roi_size: int = 0
     """Composite shape data size in floats."""
+
     stroke_color: bytes = ROI_COLOR_NONE
     """Stroke/outline color as ARGB bytes."""
+
     fill_color: bytes = ROI_COLOR_NONE
     """Fill color as ARGB bytes."""
+
     arrow_style_or_aspect_ratio: int = 0
     """Arrow style, aspect ratio for ellipse, or point_type for POINT ROIs."""
+
     arrow_head_size: int = 0
     """Arrow head size in pixels."""
+
     rounded_rect_arc_size: int = 0
     """Arc size for rounded rectangle corners."""
+
     position: int = 0
     """Position in stack (1-based, 0 means not set)."""
+
     c_position: int = 0
     """Channel position (1-based, 0 means not set)."""
+
     z_position: int = 0
     """Z-slice position (1-based, 0 means not set)."""
+
     t_position: int = 0
     """Time frame position (1-based, 0 means not set)."""
+
     x1: float = 0.0
     """First X coordinate for line ROIs or X for subpixel rectangles."""
+
     y1: float = 0.0
     """First Y coordinate for line ROIs or Y for subpixel rectangles."""
+
     x2: float = 0.0
     """Second X coordinate for line ROIs."""
+
     y2: float = 0.0
     """Second Y coordinate for line ROIs."""
+
     xd: float = 0.0
     """X coordinate for subpixel rectangles (double precision)."""
+
     yd: float = 0.0
     """Y coordinate for subpixel rectangles (double precision)."""
+
     widthd: float = 0.0
     """Width for subpixel rectangles (double precision)."""
+
     heightd: float = 0.0
     """Height for subpixel rectangles (double precision)."""
+
     overlay_label_color: bytes = ROI_COLOR_NONE
     """Overlay label color as ARGB bytes."""
+
     overlay_font_size: int = 0
     """Overlay label font size in points."""
+
     group: int = 0
+
     """Group number for grouping related ROIs."""
     image_opacity: int = 0
     """Opacity for image ROIs (0-255)."""
+
     image_size: int = 0
     """Embedded image data size in bytes."""
+
     image_data: bytes | None = None
     """Embedded image data for IMAGE subtype ROIs."""
+
     float_stroke_width: float = 0.0
     """Floating point stroke width for precise rendering."""
+
     text_size: int = 0
     """Text ROI font size in points."""
+
     text_style: int = 0
     """Text ROI font style flags (bold, italic, etc)."""
+
     text_justification: int = 0
     """Text ROI alignment (left, center, right)."""
+
     text_angle: float = 0.0
     """Text ROI rotation angle in degrees."""
+
     text_name: str = ''
     """Text ROI font name."""
+
     text: str = ''
     """Text ROI content."""
+
     counters: NDArray[numpy.uint8] | None = None
     """Counter values for each coordinate point."""
+
     counter_positions: NDArray[numpy.uint32] | None = None
     """Counter positions for each coordinate point."""
+
     integer_coordinates: NDArray[numpy.int32] | None = None
     """Integer coordinate pairs relative to bounding box."""
+
     subpixel_coordinates: NDArray[numpy.float32] | None = None
     """Floating point coordinate pairs for subpixel precision."""
+
     multi_coordinates: NDArray[numpy.float32] | None = None
     """Path data for composite shapes (MOVETO, LINETO, CLOSE operations)."""
 
@@ -656,7 +755,8 @@ class ImagejRoi:
             self.options |= ROI_OPTIONS.SUB_PIXEL_RESOLUTION
             self.subpixel_coordinates = coords.astype(numpy.float32, copy=True)
             if coords.dtype.kind == 'f':
-                coords = numpy.round(coords)
+                # ImageJ/Java use floor(x+0.5), not banker's rounding
+                coords = numpy.floor(coords + 0.5)
 
         coords = numpy.array(coords, dtype=numpy.int32)
 
@@ -865,7 +965,14 @@ class ImagejRoi:
                 if name_end <= len(data):
                     name = data[name_offset:name_end]
                     self.name = name.decode(self.utf16)
-                else:
+                elif name_offset < len(data):
+                    available = data[name_offset:]
+                    if len(available) == name_length:
+                        # name stored as Latin-1 instead of UTF-16
+                        self.name = available.decode('latin-1')
+                    else:
+                        n = (len(available) // 2) * 2
+                        self.name = available[:n].decode(self.utf16)
                     logger().warning(
                         f'ImagejRoi name exceeds data size: '
                         f'{name_end} > {len(data)}'
@@ -1402,7 +1509,7 @@ class ImagejRoi:
         elif self.multi_coordinates is not None:
             coordslist = self.path2coords(self.multi_coordinates)
             if not multi:
-                return sorted(coordslist, key=lambda x: x.size)[-1]
+                return max(coordslist, key=lambda x: x.size)
             return coordslist
         elif self.roitype == ROI_TYPE.LINE:
             coords = numpy.array(
