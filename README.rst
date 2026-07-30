@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.2.10
+:Version: 2026.7.30
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -38,14 +38,21 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.12, 3.14.3 64-bit
-- `NumPy <https://pypi.org/project/numpy>`_ 2.4.2
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.1.28 (optional)
-- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.1.14 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.10.8 (optional)
+- `CPython <https://www.python.org>`_ 3.12.10, 3.13.14, 3.14.6, 3.15.0b4 64-bit
+- `Numpy <https://pypi.org/project/numpy>`_ 2.5.1
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.7.14 (optional)
+- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.6.6 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.1 (optional)
 
 Revisions
 ---------
+
+2026.7.30
+
+- Use Java compatible rounding for subpixel coordinates (breaking).
+- Recover roi names stored as Latin-1 instead of UTF-16.
+- Drop support for Python 3.11 and numpy 2.0 (SPEC0).
+- Support Python 3.15.
 
 2026.2.10
 
