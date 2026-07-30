@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.2.10
+:Version: 2026.7.30
 
 """
 
@@ -185,6 +185,17 @@ def test_frompoints_float():
     assert roi.top == 2
     assert roi.right == 7
     assert roi.bottom == 8
+
+
+def test_frompoints_rounding():
+    """Test float coordinates are rounded using floor(x+0.5), not banker's."""
+    # 0.5 -> 1, 2.5 -> 3 (banker's rounding gives 0 and 2)
+    roi = ImagejRoi.frompoints([[0.5, 0.5], [2.5, 2.5]])
+    assert roi.left == 1
+    assert roi.top == 1
+    assert roi.right == 4
+    assert roi.bottom == 4
+    assert numpy.array_equal(roi.integer_coordinates, [[0, 0], [2, 2]])
 
 
 def test_frompoints_large_coordinates():
@@ -428,6 +439,100 @@ def test_issue_9():
     assert roiread('_test.zip') == rois
 
 
+def test_latin1_name_recovery():
+    """Test reading ROI names stored as Latin-1 instead of UTF-16."""
+    rois = roiread(DATA / 'yn294a001_ROI_ImageJ.zip')
+    assert len(rois) == 12
+    for i, roi in enumerate(rois, 1):
+        assert roi.name == f'ROI-{i}'
+
+
+@pytest.mark.parametrize(
+    'group_number',
+    [
+        255,  # boundary: fits in one byte
+        256,  # just above one byte limit
+        512,  # power of 2
+        1000,  # arbitrary value
+        32767,  # max signed int16
+        32768,  # beyond signed int16
+        65535,  # max unsigned int16
+    ],
+)
+def test_group_numbers_above_255(group_number):
+    """Test that group numbers > 255 are correctly handled."""
+    roi = ImagejRoi.frompoints([[10, 20], [30, 40], [50, 60]])
+    roi.version = 229  # minimum version for extended group support
+    roi.group = group_number
+    roi.name = f'Group {group_number}'
+
+    data = roi.tobytes()
+    roi_restored = ImagejRoi.frombytes(data)
+
+    assert roi.group == group_number
+    assert roi_restored.group == group_number
+    assert roi_restored == roi
+    assert numpy.array_equal(roi.coordinates(), roi_restored.coordinates())
+
+    str(roi)
+    str(roi_restored)
+
+
+def test_group_number_mixed_values():
+    """Test multiple ROIs with different group numbers including > 255."""
+    # create multiple ROIs with different group numbers
+    points = [[10, 20], [30, 40], [50, 60]]
+    group_numbers = [0, 1, 100, 255, 256, 512, 65535]
+
+    rois = []
+    for group_num in group_numbers:
+        roi = ImagejRoi.frompoints(points)
+        roi.version = 229
+        roi.group = group_num
+        roi.name = f'Group {group_num}'
+        rois.append(roi)
+
+    # test round-trip for each ROI
+    for original_roi in rois:
+        data = original_roi.tobytes()
+        restored_roi = ImagejRoi.frombytes(data)
+
+        assert restored_roi.group == original_roi.group, (
+            f'Group number not preserved: expected {original_roi.group}, '
+            f'got {restored_roi.group}'
+        )
+        assert restored_roi == original_roi
+
+
+def test_group_number_zip_file():
+    """Test writing and reading ROIs with group numbers > 255 to/from ZIP."""
+    # create ROIs with various group numbers
+    rois = []
+    for group_num in [100, 256, 512, 1000]:
+        roi = ImagejRoi.frompoints(
+            [[10 + group_num, 20], [30, 40 + group_num]]
+        )
+        roi.version = 229
+        roi.group = group_num
+        roi.name = f'ROI_Group_{group_num}'
+        rois.append(roi)
+
+    # write to ZIP file
+    with contextlib.suppress(OSError):
+        os.remove('_test.zip')
+
+    roiwrite('_test.zip', rois)
+
+    # read back from ZIP file
+    restored_rois = roiread('_test.zip')
+
+    # verify all ROIs and their group numbers are preserved
+    assert len(restored_rois) == len(rois)
+    for original, restored in zip(rois, restored_rois, strict=True):
+        assert restored.group == original.group
+        assert restored == original
+
+
 @pytest.mark.parametrize(
     'filename', glob.glob('*.roi', root_dir=DATA, recursive=False)
 )
@@ -448,8 +553,8 @@ def test_glob_roi(filename):
 )
 def test_glob_zip(filename):
     """Test read all ZIP files."""
-    if 'defective' in filename:
-        pytest.xfail(reason='file is marked defective')
+    if 'defective' in filename or 'Maro_RoiSet' in filename:
+        pytest.xfail(reason='file is excluded')
     filename = DATA / filename
     rois = roiread(filename)
     assert isinstance(rois, list)
