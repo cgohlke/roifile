@@ -95,15 +95,15 @@ setup(
     project_urls={
         'Bug Tracker': 'https://github.com/cgohlke/roifile/issues',
         'Source Code': 'https://github.com/cgohlke/roifile',
-        # 'Documentation': 'https://',
+        'Documentation': 'https://www.cgohlke.com/docs/roifile/',
     },
     packages=['roifile'],
     package_data={'roifile': ['py.typed']},
     entry_points={'console_scripts': ['roifile = roifile.roifile:main']},
-    python_requires='>=3.11',
-    install_requires=['numpy'],
+    python_requires='>=3.12',
+    install_requires=['numpy>=2.1'],
     extras_require={
-        'all': ['matplotlib', 'tifffile', 'imagecodecs>=2026.1.14']
+        'all': ['matplotlib', 'tifffile', 'imagecodecs>=2026.3.6']
     },
     platforms=['any'],
     classifiers=[
@@ -112,9 +112,9 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
         'Programming Language :: Python :: 3.14',
+        'Programming Language :: Python :: 3.15',
     ],
 )
