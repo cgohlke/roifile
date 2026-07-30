@@ -1,6 +1,13 @@
 Revisions
 ---------
 
+2026.7.30
+
+- Use Java compatible rounding for subpixel coordinates (breaking).
+- Recover roi names stored as Latin-1 instead of UTF-16.
+- Drop support for Python 3.11 and numpy 2.0 (SPEC0).
+- Support Python 3.15.
+
 2026.2.10
 
 - Revise wrapping of integer coordinates again (breaking).
