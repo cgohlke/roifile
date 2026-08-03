@@ -120,7 +120,7 @@ Create a new ImagejRoi instance from an array of x, y coordinates,
 then set ROI properties:
 
 .. code-block:: python
-
+    >>> from roifile import ImagejRoi
     >>> roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
     >>> roi.roitype = ROI_TYPE.POINT
     >>> roi.point_size = ROI_POINT_SIZE.LARGE
