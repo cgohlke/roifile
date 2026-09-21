@@ -39,7 +39,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.7.30
+:Version: 2026.9.22
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -54,7 +54,8 @@ View overlays stored in a ROI, ZIP, or TIFF file::
 
     python -m roifile file.roi
 
-See `Examples`_ for using the programming interface.
+See `Examples`_ and `Documentation <https://www.cgohlke.com/docs/roifile/>`_
+for using the programming interface.
 
 Source code, examples, and support are available on
 `GitHub <https://github.com/cgohlke/roifile>`_.
@@ -65,14 +66,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.12.10, 3.13.14, 3.14.6, 3.15.0b4 64-bit
-- `Numpy <https://pypi.org/project/numpy>`_ 2.5.1
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.7.14 (optional)
-- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.6.6 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.1 (optional)
+- `CPython <https://www.python.org>`_ 3.12.10, 3.13.15, 3.14.7, 3.15.0rc 64-bit
+- `Numpy <https://pypi.org/project/numpy>`_ 2.5.3
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.9.20 (optional)
+- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.8.16 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.2 (optional)
 
 Revisions
 ---------
+
+2026.9.22
+
+- Accept buffer objects and avoid unnecessary copies in ImagejRoi.frombytes.
 
 2026.7.30
 
@@ -143,6 +148,17 @@ Other Python packages handling ImageJ ROIs:
 Examples
 --------
 
+Import functions and classes used in these examples:
+
+>>> from roifile import (
+...     ImagejRoi,
+...     roiread,
+...     roiwrite,
+...     ROI_TYPE,
+...     ROI_POINT_SIZE,
+...     ROI_OPTIONS,
+... )
+
 Create a new ImagejRoi instance from an array of x, y coordinates,
 then set ROI properties:
 
@@ -204,7 +220,7 @@ Read the ROIs embedded in an ImageJ formatted TIFF file:
 >>> rois = roiread('_test.tif')
 >>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
 
-View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
+View the overlays stored in a ROI, ZIP, or TIFF file from the command line::
 
     python -m roifile _test.roi
 
@@ -214,7 +230,7 @@ For an advanced example, see `roifile_demo.py` in the source distribution.
 
 from __future__ import annotations
 
-__version__ = '2026.7.30'
+__version__ = '2026.9.22'
 
 __all__ = [
     'ROI_COLOR_NONE',
@@ -243,7 +259,7 @@ from typing import TYPE_CHECKING, Self
 import numpy
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Buffer, Iterable
     from typing import Any, Literal
 
     from matplotlib.axes import Axes
@@ -841,26 +857,28 @@ class ImagejRoi:
     @classmethod
     def frombytes(
         cls,
-        data: bytes,
+        data: Buffer,
         /,
         *,
         min_int_coord: int | None = None,
     ) -> ImagejRoi:
-        """Return ImagejRoi instance from bytes.
+        """Return ImagejRoi instance from buffer.
 
         Parameters:
-            data: Bytes in ImageJ ROI format.
+            data: Buffer in ImageJ ROI format.
             min_int_coord: Minimum integer coordinate for unwrapping.
 
         Returns:
-            ImagejRoi instance decoded from bytes.
+            ImagejRoi instance decoded from buffer.
 
         """
-        if len(data) < 64:
-            msg = f'ImageJ ROI data too short: {len(data)} < 64 bytes'
+        data = memoryview(data)
+        size = len(data)
+        if size < 64:
+            msg = f'ImageJ ROI data too short: {size} < 64 bytes'
             raise ValueError(msg)
-        if data[:4] != b'Iout':
-            msg = f'not an ImageJ ROI {data[:4]!r}'
+        if data[:4].tobytes() != b'Iout':
+            msg = f'not an ImageJ ROI {data[:4].tobytes()!r}'
             raise ValueError(msg)
 
         self = cls()
@@ -885,8 +903,8 @@ class ImagejRoi:
             self.rounded_rect_arc_size,
             self.position,
             header2_offset,
-        ) = struct.unpack(
-            self.byteorder + 'hBxhhhhH16xhi4s4shhBBhii', data[4:64]
+        ) = struct.unpack_from(
+            self.byteorder + 'hBxhhhhH16xhi4s4shhBBhii', data, 4
         )
 
         min_int_coord = ImagejRoi.min_int_coord(min_int_coord)
@@ -915,22 +933,22 @@ class ImagejRoi:
         self.options = ROI_OPTIONS(options)
 
         if self.subpixelrect:
-            self.xd, self.yd, self.widthd, self.heightd = struct.unpack(
-                self.byteorder + 'ffff', data[18:34]
+            self.xd, self.yd, self.widthd, self.heightd = struct.unpack_from(
+                self.byteorder + 'ffff', data, 18
             )
         elif self.roitype == ROI_TYPE.LINE or (
             self.roitype == ROI_TYPE.FREEHAND
             and self.subtype in {ROI_SUBTYPE.ELLIPSE, ROI_SUBTYPE.ROTATED_RECT}
         ):
-            self.x1, self.y1, self.x2, self.y2 = struct.unpack(
-                self.byteorder + 'ffff', data[18:34]
+            self.x1, self.y1, self.x2, self.y2 = struct.unpack_from(
+                self.byteorder + 'ffff', data, 18
             )
         elif self.n_coordinates == 0:
-            self.n_coordinates = struct.unpack(
-                self.byteorder + 'i', data[18:22]
+            self.n_coordinates = struct.unpack_from(
+                self.byteorder + 'i', data, 18
             )[0]
 
-        if 0 < header2_offset < len(data) - 52:
+        if 0 < header2_offset < size - 52:
             (
                 self.c_position,
                 self.z_position,
@@ -946,54 +964,54 @@ class ImagejRoi:
                 roi_props_offset,
                 roi_props_length,
                 counters_offset,
-            ) = struct.unpack(
-                self.byteorder + '4xiiiii4shBBifiii',
-                data[header2_offset : header2_offset + 52],
+            ) = struct.unpack_from(
+                self.byteorder + '4xiiiii4shBBifiii', data, header2_offset
             )
 
             # handle extended group for version >= 229 (groups > 255)
             if self.version >= 229 and self.group == 0:
                 group_offset = header2_offset + 52
-                if group_offset + 2 <= len(data):
-                    self.group = struct.unpack(
-                        self.byteorder + 'H',
-                        data[group_offset : group_offset + 2],
+                if group_offset + 2 <= size:
+                    self.group = struct.unpack_from(
+                        self.byteorder + 'H', data, group_offset
                     )[0]
 
             if name_offset > 0 and name_length > 0:
                 name_end = name_offset + name_length * 2
-                if name_end <= len(data):
-                    name = data[name_offset:name_end]
-                    self.name = name.decode(self.utf16)
-                elif name_offset < len(data):
+                if name_end <= size:
+                    self.name = str(
+                        data[name_offset:name_end], encoding=self.utf16
+                    )
+                elif name_offset < size:
                     available = data[name_offset:]
                     if len(available) == name_length:
                         # name stored as Latin-1 instead of UTF-16
-                        self.name = available.decode('latin-1')
+                        self.name = str(available, encoding='latin-1')
                     else:
                         n = (len(available) // 2) * 2
-                        self.name = available[:n].decode(self.utf16)
+                        self.name = str(available[:n], encoding=self.utf16)
                     logger().warning(
                         f'ImagejRoi name exceeds data size: '
-                        f'{name_end} > {len(data)}'
+                        f'{name_end} > {size}'
                     )
 
             if roi_props_offset > 0 and roi_props_length > 0:
                 props_end = roi_props_offset + roi_props_length * 2
-                if props_end <= len(data):
-                    props = data[roi_props_offset:props_end]
-                    self.props = props.decode(self.utf16)
+                if props_end <= size:
+                    self.props = str(
+                        data[roi_props_offset:props_end], encoding=self.utf16
+                    )
                 else:
                     logger().warning(
                         f'ImagejRoi props exceeds data size: '
-                        f'{props_end} > {len(data)}'
+                        f'{props_end} > {size}'
                     )
 
             if counters_offset > 0:
-                counters: NDArray[numpy.uint32] = numpy.ndarray(
-                    shape=self.n_coordinates,
+                counters: NDArray[numpy.uint32] = numpy.frombuffer(
+                    data,
                     dtype=self.byteorder + 'u4',
-                    buffer=data,
+                    count=self.n_coordinates,
                     offset=counters_offset,
                 )
                 self.counters = (counters & 0xFF).astype(numpy.uint8)
@@ -1007,28 +1025,30 @@ class ImagejRoi:
                 style_and_justification,
                 name_length,
                 text_length,
-            ) = struct.unpack(self.byteorder + 'iiii', data[64:80])
+            ) = struct.unpack_from(self.byteorder + 'iiii', data, 64)
             self.text_style = style_and_justification & 255
             self.text_justification = (style_and_justification >> 8) & 3
             off = 80
-            self.text_name = data[off : off + name_length * 2].decode(
-                self.utf16
+            self.text_name = str(
+                data[off : off + name_length * 2], encoding=self.utf16
             )
             off += name_length * 2
-            self.text = data[off : off + text_length * 2].decode(self.utf16)
+            self.text = str(
+                data[off : off + text_length * 2], encoding=self.utf16
+            )
             if self.version >= 225:
                 off += text_length * 2
-                self.text_angle = struct.unpack(
-                    self.byteorder + 'f', data[off : off + 4]
+                self.text_angle = struct.unpack_from(
+                    self.byteorder + 'f', data, off
                 )[0]
 
         elif self.version >= 221 and self.subtype == ROI_SUBTYPE.IMAGE:
-            if 0 < self.image_size <= len(data) - 64:
-                self.image_data = data[64 : 64 + self.image_size]
+            if 0 < self.image_size <= size - 64:
+                self.image_data = data[64 : 64 + self.image_size].tobytes()
             else:
                 logger().warning(
                     'ImagejRoi image data invalid: '
-                    f'size={self.image_size}, data length={len(data)}'
+                    f'size={self.image_size}, data length={size}'
                 )
 
         elif self.roitype in (
@@ -1040,34 +1060,44 @@ class ImagejRoi:
             ROI_TYPE.ANGLE,
             ROI_TYPE.POINT,
         ):
-            self.integer_coordinates = numpy.ndarray(
-                shape=(self.n_coordinates, 2),
-                dtype=self.byteorder + 'i2',
-                buffer=data,
-                offset=64,
-                order='F',
-            ).astype(numpy.int32)
+            self.integer_coordinates = (
+                numpy.frombuffer(
+                    data,
+                    dtype=self.byteorder + 'i2',
+                    count=self.n_coordinates * 2,
+                    offset=64,
+                )
+                .reshape((self.n_coordinates, 2), order='F')
+                .astype(numpy.int32)
+            )
 
             # unwrap negative integer_coordinates (wrapped uint16 values)
             select = self.integer_coordinates < 0
             self.integer_coordinates[select] += 65536
 
             if self.subpixelresolution:
-                self.subpixel_coordinates = numpy.ndarray(
-                    shape=(self.n_coordinates, 2),
-                    dtype=self.byteorder + 'f4',
-                    buffer=data,
-                    offset=64 + self.n_coordinates * 4,
-                    order='F',
-                ).copy()
+                self.subpixel_coordinates = (
+                    numpy.frombuffer(
+                        data,
+                        dtype=self.byteorder + 'f4',
+                        count=self.n_coordinates * 2,
+                        offset=64 + self.n_coordinates * 4,
+                    )
+                    .reshape((self.n_coordinates, 2), order='F')
+                    .copy()
+                )
 
         elif self.composite and self.roitype == ROI_TYPE.RECT:
-            self.multi_coordinates = numpy.ndarray(
-                shape=self.shape_roi_size,
-                dtype=self.byteorder + 'f4',
-                buffer=data,
-                offset=64,
-            ).copy()
+            self.multi_coordinates = (
+                numpy.frombuffer(
+                    data,
+                    dtype=self.byteorder + 'f4',
+                    count=numpy.prod(self.shape_roi_size),
+                    offset=64,
+                )
+                .reshape(self.shape_roi_size)
+                .copy()
+            )
 
         elif self.roitype not in (ROI_TYPE.RECT, ROI_TYPE.LINE, ROI_TYPE.OVAL):
             logger().warning(f'cannot handle ImagejRoi type {self.roitype!r}')
