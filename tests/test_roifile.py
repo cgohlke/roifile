@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.7.30
+:Version: 2026.9.22
 
 """
 
@@ -206,6 +206,15 @@ def test_frompoints_large_coordinates():
     assert roi.top == 60535, roi.top
     assert roi.right == 60535, roi.right
     assert roi.bottom == 65535, roi.bottom
+
+
+@pytest.mark.parametrize('buffertype', [bytes, bytearray, memoryview])
+def test_frombytes_buffer(buffertype):
+    """Test reading ROI from buffer-protocol inputs."""
+    roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
+    roi2 = ImagejRoi.frombytes(buffertype(roi.tobytes()))
+    assert roi2 == roi
+    assert numpy.array_equal(roi2.coordinates(), roi.coordinates())
 
 
 @pytest.mark.parametrize(
