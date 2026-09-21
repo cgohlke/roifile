@@ -12,7 +12,7 @@ interest, geometric shapes, paths, text, and whatnot for image overlays.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2026.7.30
+:Version: 2026.9.22
 :DOI: `10.5281/zenodo.6941603 <https://doi.org/10.5281/zenodo.6941603>`_
 
 Quickstart
@@ -27,7 +27,8 @@ View overlays stored in a ROI, ZIP, or TIFF file::
 
     python -m roifile file.roi
 
-See `Examples`_ for using the programming interface.
+See `Examples`_ and `Documentation <https://www.cgohlke.com/docs/roifile/>`_
+for using the programming interface.
 
 Source code, examples, and support are available on
 `GitHub <https://github.com/cgohlke/roifile>`_.
@@ -38,14 +39,18 @@ Requirements
 This revision was tested with the following requirements and dependencies
 (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.12.10, 3.13.14, 3.14.6, 3.15.0b4 64-bit
-- `Numpy <https://pypi.org/project/numpy>`_ 2.5.1
-- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.7.14 (optional)
-- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.6.6 (optional)
-- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.1 (optional)
+- `CPython <https://www.python.org>`_ 3.12.10, 3.13.15, 3.14.7, 3.15.0rc 64-bit
+- `Numpy <https://pypi.org/project/numpy>`_ 2.5.3
+- `Tifffile <https://pypi.org/project/tifffile/>`_ 2026.9.20 (optional)
+- `Imagecodecs <https://pypi.org/project/imagecodecs/>`_ 2026.8.16 (optional)
+- `Matplotlib <https://pypi.org/project/matplotlib/>`_ 3.11.2 (optional)
 
 Revisions
 ---------
+
+2026.9.22
+
+- Accept buffer objects and avoid unnecessary copies in ImagejRoi.frombytes.
 
 2026.7.30
 
@@ -115,6 +120,19 @@ Other Python packages handling ImageJ ROIs:
 
 Examples
 --------
+
+Import functions and classes used in these examples:
+
+.. code-block:: python
+
+    >>> from roifile import (
+    ...     ImagejRoi,
+    ...     roiread,
+    ...     roiwrite,
+    ...     ROI_TYPE,
+    ...     ROI_POINT_SIZE,
+    ...     ROI_OPTIONS,
+    ... )
 
 Create a new ImagejRoi instance from an array of x, y coordinates,
 then set ROI properties:
@@ -193,7 +211,7 @@ Read the ROIs embedded in an ImageJ formatted TIFF file:
     >>> rois = roiread('_test.tif')
     >>> assert len(rois) == 2 and rois[0] == roi and rois[1].name == 'test'
 
-View the overlays stored in a ROI, ZIP, or TIFF file from a command line::
+View the overlays stored in a ROI, ZIP, or TIFF file from the command line::
 
     python -m roifile _test.roi
 
