@@ -1,6 +1,10 @@
 Revisions
 ---------
 
+2026.9.22
+
+- Accept buffer objects and avoid unnecessary copies in ImagejRoi.frombytes.
+
 2026.7.30
 
 - Use Java compatible rounding for subpixel coordinates (breaking).
