@@ -29,7 +29,7 @@
 
 """Unittests for the roifile package.
 
-:Version: 2026.9.22
+:Version: 2026.11.6
 
 """
 
@@ -46,6 +46,7 @@ from typing import Any
 import numpy
 import pytest
 from matplotlib import pyplot
+from numpy import array_equal  # faster than numpy.testing.assert_array_equal
 
 import roifile
 from roifile import (
@@ -66,14 +67,14 @@ DATA = HERE / 'data'
 
 
 @pytest.mark.skipif(__doc__ is None, reason='__doc__ is None')
-def test_version():
+def test_version() -> None:
     """Assert roifile versions match docstrings."""
     ver = ':Version: ' + __version__
     assert ver in __doc__
     assert ver in roifile.__doc__
 
 
-def test_read_zip_file():
+def test_read_zip_file() -> None:
     """Test reading ROIs from a ZIP file."""
     rois: Any = ImagejRoi.fromfile(DATA / 'ijzip.zip')
     assert isinstance(rois, list)
@@ -85,7 +86,7 @@ def test_read_zip_file():
         str(roi)
 
 
-def test_write_zip_file():
+def test_write_zip_file() -> None:
     """Test writing ROIs to a ZIP file."""
     rois: Any = ImagejRoi.fromfile(DATA / 'ijzip.zip')
 
@@ -98,8 +99,11 @@ def test_write_zip_file():
     roiwrite('_test.zip', roi_iter())
     assert roiread('_test.zip') == rois
 
+    with pytest.raises(ValueError, match='only be written to ZIP'):
+        roiwrite('_test.roi', rois)
 
-def test_read_tiff_file():
+
+def test_read_tiff_file() -> None:
     """Test reading ROIs from a TIFF file."""
     rois = roiread(DATA / 'IJMetadata.tif')
     assert isinstance(rois, list)
@@ -109,12 +113,36 @@ def test_read_tiff_file():
         str(roi)
 
 
-def test_empty_roi():
+def test_empty_roi() -> None:
     """Test empty ROI equality."""
     assert ImagejRoi() == ImagejRoi()
+    roi = ImagejRoi.frombytes(ImagejRoi().tobytes())
+    assert (roi.right, roi.bottom) == (0, 0)
+    assert roi == ImagejRoi()
 
 
-def test_box_combined():
+def test_roundtrip_fields() -> None:
+    """Test round-trip of options bit 15 and non-BMP strings."""
+    roi = ImagejRoi.frompoints([[1, 2], [3, 4]], name='a\U0001f600b')
+    roi.options |= ROI_OPTIONS.UNKNOWN_15
+    roi.props = 'key: \U0001f600\n'
+    roi2 = ImagejRoi.frombytes(roi.tobytes())
+    assert roi2 == roi
+    assert roi2.options == roi.options
+    assert roi2.name == roi.name
+    assert roi2.props == roi.props
+
+
+def test_hexcolor_autoname() -> None:
+    """Test hexcolor byte order and autoname."""
+    color = b'\xff\x11\x22\x33'  # ARGB
+    assert ImagejRoi().hexcolor(color) == '#112233'
+    assert ImagejRoi(byteorder='<').hexcolor(color[::-1]) == '#112233'
+    roi = ImagejRoi(left=100, top=200, right=110, bottom=220)
+    assert roi.autoname == '00210-00105'
+
+
+def test_box_combined() -> None:
     """Test box_combined composite ROI."""
     rois = roiread(DATA / 'box_combined.roi')
     assert isinstance(rois, ImagejRoi)
@@ -138,7 +166,7 @@ def test_box_combined():
     str(roi)
 
 
-def test_frompoints_integer():
+def test_frompoints_integer() -> None:
     """Test creating ROI from integer coordinates."""
     roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
@@ -156,8 +184,9 @@ def test_frompoints_integer():
     roi.point_size = 17
     assert roi.point_size == ROI_POINT_SIZE.XXL
     roi.point_size = 100
-    assert roi.point_size == ROI_POINT_SIZE.UNKNOWN
-    assert roi.point_size.value == 100
+    assert roi.point_size.name == 'UNKNOWN'
+    assert roi.point_size == 100
+    assert ROI_POINT_SIZE.UNKNOWN.value == -1
 
     # test ROI_POINT_TYPE
     roi.point_type = ROI_POINT_TYPE.CROSS
@@ -167,8 +196,9 @@ def test_frompoints_integer():
     roi.point_type = 3
     assert roi.point_type == ROI_POINT_TYPE.CIRCLE
     roi.point_type = 100
-    assert roi.point_type == ROI_POINT_TYPE.UNKNOWN
-    assert roi.point_type.value == 100
+    assert roi.point_type.name == 'UNKNOWN'
+    assert roi.point_type == 100
+    assert ROI_POINT_TYPE.UNKNOWN.value == -1
 
     # verify round-trip with point properties
     roi2 = ImagejRoi.frombytes(roi.tobytes())
@@ -177,7 +207,7 @@ def test_frompoints_integer():
     assert roi2 == roi
 
 
-def test_frompoints_float():
+def test_frompoints_float() -> None:
     """Test creating ROI from float coordinates."""
     roi = ImagejRoi.frompoints([[1.1, 2.2], [3.3, 4.4], [5.5, 6.6]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
@@ -186,8 +216,15 @@ def test_frompoints_float():
     assert roi.right == 7
     assert roi.bottom == 8
 
+    # subpixel coordinates without integer coordinates
+    roi.integer_coordinates = None
+    roi2 = ImagejRoi.frombytes(roi.tobytes())
+    assert roi2.integer_coordinates is not None
+    assert array_equal(roi2.integer_coordinates, [[0, 0], [2, 2], [5, 5]])
+    assert array_equal(roi2.coordinates(), roi.coordinates())
 
-def test_frompoints_rounding():
+
+def test_frompoints_rounding() -> None:
     """Test float coordinates are rounded using floor(x+0.5), not banker's."""
     # 0.5 -> 1, 2.5 -> 3 (banker's rounding gives 0 and 2)
     roi = ImagejRoi.frompoints([[0.5, 0.5], [2.5, 2.5]])
@@ -195,10 +232,11 @@ def test_frompoints_rounding():
     assert roi.top == 1
     assert roi.right == 4
     assert roi.bottom == 4
-    assert numpy.array_equal(roi.integer_coordinates, [[0, 0], [2, 2]])
+    assert roi.integer_coordinates is not None
+    assert array_equal(roi.integer_coordinates, [[0, 0], [2, 2]])
 
 
-def test_frompoints_large_coordinates():
+def test_frompoints_large_coordinates() -> None:
     """Test creating ROI from large coordinate values."""
     roi = ImagejRoi.frompoints([[-5000, 60535], [60534, 65534]])
     assert roi == ImagejRoi.frombytes(roi.tobytes())
@@ -209,12 +247,12 @@ def test_frompoints_large_coordinates():
 
 
 @pytest.mark.parametrize('buffertype', [bytes, bytearray, memoryview])
-def test_frombytes_buffer(buffertype):
+def test_frombytes_buffer(buffertype: Any) -> None:
     """Test reading ROI from buffer-protocol inputs."""
     roi = ImagejRoi.frompoints([[1, 2], [3, 4], [5, 6]])
     roi2 = ImagejRoi.frombytes(buffertype(roi.tobytes()))
     assert roi2 == roi
-    assert numpy.array_equal(roi2.coordinates(), roi.coordinates())
+    assert array_equal(roi2.coordinates(), roi.coordinates())
 
 
 @pytest.mark.parametrize(
@@ -229,20 +267,20 @@ def test_frombytes_buffer(buffertype):
         [[-5000, 60535], [60534, 65534]],  # original issue #13
     ],
 )
-def test_coordinate_wrapping_roundtrip(points):
+def test_coordinate_wrapping_roundtrip(points: list[list[int]]) -> None:
     """Test that coordinates correctly roundtrip through int16 wrapping."""
     roi1 = ImagejRoi.frompoints(points)
     data = roi1.tobytes()
     roi2 = ImagejRoi.frombytes(data)
 
     assert roi1 == roi2
-    assert numpy.array_equal(
-        roi1.integer_coordinates, roi2.integer_coordinates
-    )
-    assert numpy.array_equal(roi1.coordinates(), roi2.coordinates())
+    assert roi1.integer_coordinates is not None
+    assert roi2.integer_coordinates is not None
+    assert array_equal(roi1.integer_coordinates, roi2.integer_coordinates)
+    assert array_equal(roi1.coordinates(), roi2.coordinates())
 
 
-def test_min_int_coord_parameter():
+def test_min_int_coord_parameter() -> None:
     """Test that min_int_coord parameter is respected."""
     # test with default -5000
     roi = ImagejRoi.frompoints([[-5000, 0], [100, 100]])
@@ -264,7 +302,7 @@ def test_min_int_coord_parameter():
 
 
 @pytest.mark.parametrize('kind', ['uint8', 'uint16', 'float32', 'rgb'])
-def test_image_subtype(kind):
+def test_image_subtype(kind: str) -> None:
     """Test creating IMAGE subtype ROI."""
     image: numpy.ndarray
     if kind == 'rgb':
@@ -308,7 +346,7 @@ def test_image_subtype(kind):
     str(roi2)
 
 
-def test_rotated_text():
+def test_rotated_text() -> None:
     """Test reading rotated text ROI."""
     rois = roiread(DATA / 'text_rotated.roi')
     assert isinstance(rois, ImagejRoi)
@@ -330,8 +368,16 @@ def test_rotated_text():
     assert roi.tobytes() == expected
     str(roi)
 
+    roi.text_draw_string_mode = True
+    roi.text = 'text \U0001f600'
+    roi2 = ImagejRoi.frombytes(roi.tobytes())
+    assert roi2.text_draw_string_mode
+    assert roi2.text_justification == 1
+    assert roi2.text == roi.text
+    assert roi2.text_angle == roi.text_angle
 
-def test_properties():
+
+def test_properties() -> None:
     """Test ROI properties."""
     rois = ImagejRoi.fromfile(DATA / '27197299958_88cf5966d3_b.tif')
     assert isinstance(rois, list)
@@ -379,7 +425,7 @@ def test_properties():
     assert 'BY: 98\nBool: false\n' in roi.props  # sorted by key
 
 
-def test_zipfile():
+def test_zipfile() -> None:
     """Test ROIs from ZIP file."""
     rois = ImagejRoi.fromfile(DATA / 'ijzip.zip')
     assert isinstance(rois, list)
@@ -390,9 +436,10 @@ def test_zipfile():
         str(roi)
 
 
-def test_pickle():
+def test_pickle() -> None:
     """Test pickling ROI."""
     rois = ImagejRoi.fromfile(DATA / 'ijzip.zip')
+    assert isinstance(rois, list)
     fh = io.BytesIO()
     pickle.dump(rois, fh)
     for roi0, roi1 in zip(
@@ -401,7 +448,7 @@ def test_pickle():
         assert roi0 == roi1
 
 
-def test_issue_7():
+def test_issue_7() -> None:
     """Test issue #7: large coordinate values."""
     roi = ImagejRoi.frompoints(
         numpy.load(DATA / 'issue7.npy').astype(numpy.float32)
@@ -420,7 +467,7 @@ def test_issue_7():
     assert roi.subpixel_coordinates[0, 1] == 42215.0
 
 
-def test_issue_9():
+def test_issue_9() -> None:
     """Test issue #9: roiwrite with iterable input."""
     # re-write ROIs to a ZIP file
     rois: Any = ImagejRoi.fromfile(DATA / 'ijzip.zip')
@@ -448,9 +495,10 @@ def test_issue_9():
     assert roiread('_test.zip') == rois
 
 
-def test_latin1_name_recovery():
+def test_latin1_name_recovery() -> None:
     """Test reading ROI names stored as Latin-1 instead of UTF-16."""
     rois = roiread(DATA / 'yn294a001_ROI_ImageJ.zip')
+    assert isinstance(rois, list)
     assert len(rois) == 12
     for i, roi in enumerate(rois, 1):
         assert roi.name == f'ROI-{i}'
@@ -468,7 +516,7 @@ def test_latin1_name_recovery():
         65535,  # max unsigned int16
     ],
 )
-def test_group_numbers_above_255(group_number):
+def test_group_numbers_above_255(group_number: int) -> None:
     """Test that group numbers > 255 are correctly handled."""
     roi = ImagejRoi.frompoints([[10, 20], [30, 40], [50, 60]])
     roi.version = 229  # minimum version for extended group support
@@ -481,13 +529,13 @@ def test_group_numbers_above_255(group_number):
     assert roi.group == group_number
     assert roi_restored.group == group_number
     assert roi_restored == roi
-    assert numpy.array_equal(roi.coordinates(), roi_restored.coordinates())
+    assert array_equal(roi.coordinates(), roi_restored.coordinates())
 
     str(roi)
     str(roi_restored)
 
 
-def test_group_number_mixed_values():
+def test_group_number_mixed_values() -> None:
     """Test multiple ROIs with different group numbers including > 255."""
     # create multiple ROIs with different group numbers
     points = [[10, 20], [30, 40], [50, 60]]
@@ -513,7 +561,7 @@ def test_group_number_mixed_values():
         assert restored_roi == original_roi
 
 
-def test_group_number_zip_file():
+def test_group_number_zip_file() -> None:
     """Test writing and reading ROIs with group numbers > 255 to/from ZIP."""
     # create ROIs with various group numbers
     rois = []
@@ -534,6 +582,7 @@ def test_group_number_zip_file():
 
     # read back from ZIP file
     restored_rois = roiread('_test.zip')
+    assert isinstance(restored_rois, list)
 
     # verify all ROIs and their group numbers are preserved
     assert len(restored_rois) == len(rois)
@@ -545,27 +594,38 @@ def test_group_number_zip_file():
 @pytest.mark.parametrize(
     'filename', glob.glob('*.roi', root_dir=DATA, recursive=False)
 )
-def test_glob_roi(filename):
+def test_glob_roi(filename: str) -> None:
     """Test read all ROI files."""
     if 'defective' in filename:
         pytest.xfail(reason='file is marked defective')
-    filename = DATA / filename
-    roi = ImagejRoi.fromfile(filename)
+    roi = ImagejRoi.fromfile(DATA / filename)
     assert isinstance(roi, ImagejRoi)
     str(roi)
     roi.plot(show=False)
     pyplot.close()
 
 
+def test_plot_multiple_rois_with_existing_axes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test plotting multiple ROIs on caller-provided axes with show=True."""
+    roi = ImagejRoi.frompoints([[1, 2], [3, 4]])
+    _, ax = pyplot.subplots()
+    monkeypatch.setattr(pyplot, 'show', lambda: None)
+
+    roi.plot(ax=ax, rois=[roi])
+
+    pyplot.close('all')
+
+
 @pytest.mark.parametrize(
     'filename', glob.glob('*.zip', root_dir=DATA, recursive=False)
 )
-def test_glob_zip(filename):
+def test_glob_zip(filename: str) -> None:
     """Test read all ZIP files."""
     if 'defective' in filename or 'Maro_RoiSet' in filename:
         pytest.xfail(reason='file is excluded')
-    filename = DATA / filename
-    rois = roiread(filename)
+    rois = roiread(DATA / filename)
     assert isinstance(rois, list)
     for roi in rois:
         str(roi)
@@ -583,7 +643,3 @@ if __name__ == '__main__':
     argv.append('--cov=roifile')
     argv.append('--verbose')
     sys.exit(pytest.main(argv))
-
-
-# mypy: allow-untyped-defs, allow-untyped-calls
-# mypy: disable-error-code="arg-type"
