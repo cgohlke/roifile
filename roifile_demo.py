@@ -2,6 +2,7 @@
 
 # Copyright (c) Christoph Gohlke
 # SPDX-License-Identifier: BSD-3-Clause
+# See LICENSE file in the project root for details.
 
 """Demonstrate the roifile module.
 
@@ -38,7 +39,7 @@ with TiffFile('tests/data/box.tif') as tif:
     assert tif.imagej_metadata is not None
     overlays = tif.imagej_metadata['Overlays']
 
-plot_image_overlays(image, overlays)
+plot_image_overlays(image, overlays, color=None)
 
 # segment the image with scikit-image
 labeled = label(image > 0.5 * image.max())
@@ -53,7 +54,7 @@ overlays = [
     for contour in find_contours(segmentation, level=0.9999)
 ]
 
-plot_image_overlays(image, overlays, linewidth=5)
+plot_image_overlays(image, overlays, linewidth=5, color=None)
 
 # write the image and overlays to a new ImageJ TIFF file
 imwrite('roi_test.tif', image, imagej=True, metadata={'Overlays': overlays})
