@@ -1,5 +1,20 @@
+..
+  This file is updated by setup.py. Do not edit.
+
 Revisions
----------
+=========
+
+2026.11.6
+
+- Fix undefined enum values overwriting UNKNOWN member value (breaking).
+- Fix autoname to use center of bounding box (breaking).
+- Fix writing names, properties, and text with non-BMP characters.
+- Fix unwrapping of empty bounding boxes.
+- Fix coordinates of subpixel RECT and OVAL ROIs.
+- Fix various edge cases in reading, writing, and hexcolor.
+- Raise ValueError on oversized data and skip non-ROI ZIP entries (breaking).
+- Add text_draw_string_mode field.
+- Improve plotting (closed and filled shapes, colors, pixel offset).
 
 2026.9.22
 
